@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/leonidboykov/go-mutesting/internal/models"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/leonidboykov/go-mutesting/internal/models"
 )
 
 func TestFilesOfArgs(t *testing.T) {
