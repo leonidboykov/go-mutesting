@@ -2,9 +2,10 @@ package importing
 
 import (
 	"fmt"
-	"github.com/avito-tech/go-mutesting/internal/models"
 	"os"
 	"testing"
+
+	"github.com/leonidboykov/go-mutesting/internal/models"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -41,20 +42,20 @@ func TestFilesOfArgs(t *testing.T) {
 		},
 		// packages
 		{
-			[]string{"github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures"},
+			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures"},
 			[]string{
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/first.go",
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/second.go",
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/third.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/first.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/third.go",
 			},
 		},
 		{
-			[]string{"github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/..."},
+			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
 			[]string{
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/first.go",
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/second.go",
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/third.go",
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage/fourth.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/first.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/third.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage/fourth.go",
 			},
 		},
 	} {
@@ -101,31 +102,31 @@ func TestPackagesWithFilesOfArgs(t *testing.T) {
 		},
 		// packages
 		{
-			[]string{"github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures"},
+			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures"},
 			[]Package{{
-				Name: p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures",
+				Name: p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures",
 				Files: []string{
-					p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/first.go",
-					p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/second.go",
-					p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/third.go",
+					p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/first.go",
+					p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
+					p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/third.go",
 				},
 			}},
 		},
 		{
-			[]string{"github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/..."},
+			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
 			[]Package{
 				{
-					Name: p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures",
+					Name: p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures",
 					Files: []string{
-						p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/first.go",
-						p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/second.go",
-						p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/third.go",
+						p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/first.go",
+						p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
+						p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/third.go",
 					},
 				},
 				{
-					Name: p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage",
+					Name: p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage",
 					Files: []string{
-						p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage/fourth.go",
+						p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage/fourth.go",
 					},
 				},
 			},
@@ -161,10 +162,10 @@ func TestFilesWithSkipWithoutTests(t *testing.T) {
 		},
 		// packages
 		{
-			[]string{"github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/..."},
+			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
 			[]string{
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/second.go",
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/third.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/third.go",
 			},
 		},
 	} {
@@ -203,9 +204,9 @@ func TestFilesWithSkipWithBuildTagsTests(t *testing.T) {
 		},
 		// packages
 		{
-			[]string{"github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/..."},
+			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
 			[]string{
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/second.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
 			},
 		},
 	} {
@@ -278,23 +279,23 @@ func TestFilesWithExcludedDirs(t *testing.T) {
 
 		//packages
 		{
-			[]string{"github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/..."},
+			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
 			[]string{
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/first.go",
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/second.go",
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/third.go",
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage/fourth.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/first.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/third.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage/fourth.go",
 			},
 			[]string{"filepathfixtures"},
 		},
 		{
-			[]string{"github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/..."},
+			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
 			[]string{
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/first.go",
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/second.go",
-				p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/third.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/first.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
+				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/third.go",
 			},
-			[]string{p + "github.com/avito-tech/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage/"},
+			[]string{p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage/"},
 		},
 	} {
 		var opts = &models.Options{}
