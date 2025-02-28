@@ -21,20 +21,20 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/avito-tech/go-mutesting/internal/importing"
-	"github.com/avito-tech/go-mutesting/internal/models"
 	"github.com/jessevdk/go-flags"
+	"github.com/leonidboykov/go-mutesting/internal/importing"
+	"github.com/leonidboykov/go-mutesting/internal/models"
 	"github.com/zimmski/osutil"
 
-	"github.com/avito-tech/go-mutesting"
-	"github.com/avito-tech/go-mutesting/astutil"
-	"github.com/avito-tech/go-mutesting/mutator"
-	_ "github.com/avito-tech/go-mutesting/mutator/arithmetic"
-	_ "github.com/avito-tech/go-mutesting/mutator/branch"
-	_ "github.com/avito-tech/go-mutesting/mutator/expression"
-	_ "github.com/avito-tech/go-mutesting/mutator/loop"
-	_ "github.com/avito-tech/go-mutesting/mutator/numbers"
-	_ "github.com/avito-tech/go-mutesting/mutator/statement"
+	"github.com/leonidboykov/go-mutesting"
+	"github.com/leonidboykov/go-mutesting/astutil"
+	"github.com/leonidboykov/go-mutesting/mutator"
+	_ "github.com/leonidboykov/go-mutesting/mutator/arithmetic"
+	_ "github.com/leonidboykov/go-mutesting/mutator/branch"
+	_ "github.com/leonidboykov/go-mutesting/mutator/expression"
+	_ "github.com/leonidboykov/go-mutesting/mutator/loop"
+	_ "github.com/leonidboykov/go-mutesting/mutator/numbers"
+	_ "github.com/leonidboykov/go-mutesting/mutator/statement"
 )
 
 const (

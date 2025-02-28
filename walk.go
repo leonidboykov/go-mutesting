@@ -7,7 +7,7 @@ import (
 	"go/types"
 	"strings"
 
-	"github.com/avito-tech/go-mutesting/mutator"
+	"github.com/leonidboykov/go-mutesting/mutator"
 )
 
 // CountWalk returns the number of corresponding mutations for a given mutator. It traverses the AST of the given node
