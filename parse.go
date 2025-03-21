@@ -86,10 +86,12 @@ func ParseAndTypeCheckFile(file string) (*ast.File, *token.FileSet, *types.Packa
 // Skips checks all comments and finds `//nomutesting` directives.
 func Skips(fset *token.FileSet, f *ast.File) map[int]struct{} {
 	skippedLines := make(map[int]struct{})
-	for _, g := range f.Comments {
-		text := strings.TrimLeft(g.Text(), "/ ")
-		if strings.HasPrefix(text, "nomutesting") {
-			skippedLines[fset.Position(g.Pos()).Line] = struct{}{}
+	for _, commentGroup := range f.Comments {
+		for _, comment := range commentGroup.List {
+			text := strings.TrimLeft(comment.Text, "/ ")
+			if strings.HasPrefix(text, "nomutesting") {
+				skippedLines[fset.Position(comment.Pos()).Line] = struct{}{}
+			}
 		}
 	}
 	return skippedLines
