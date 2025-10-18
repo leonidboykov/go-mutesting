@@ -19,7 +19,7 @@ import (
 	"strings"
 	"syscall"
 
-	"gopkg.in/yaml.v3"
+	"github.com/goccy/go-yaml"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/leonidboykov/go-mutesting/internal/importing"
