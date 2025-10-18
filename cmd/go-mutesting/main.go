@@ -24,7 +24,6 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/leonidboykov/go-mutesting/internal/importing"
 	"github.com/leonidboykov/go-mutesting/internal/models"
-	"github.com/zimmski/osutil"
 
 	"github.com/leonidboykov/go-mutesting"
 	"github.com/leonidboykov/go-mutesting/astutil"
@@ -226,7 +225,7 @@ MUTATOR:
 		tmpFile := tmpDir + "/" + file
 
 		originalFile := fmt.Sprintf("%s.original", tmpFile)
-		err = osutil.CopyFile(file, originalFile)
+		err = CopyFile(file, originalFile)
 		if err != nil {
 			panic(err)
 		}
@@ -456,7 +455,7 @@ func mutateExec(
 		if err != nil {
 			panic(err)
 		}
-		err = osutil.CopyFile(mutationFile, file)
+		err = CopyFile(mutationFile, file)
 		if err != nil {
 			panic(err)
 		}
@@ -587,4 +586,55 @@ func saveAST(mutationBlackList map[string]struct{}, file string, fset *token.Fil
 	}
 
 	return checksum, false, nil
+}
+
+// CopyFile copies a file from src to dst.
+//
+// Code copied from "github.com/zimmski/osutil". This package fails to compile
+// with alpine.
+func CopyFile(src string, dst string) (err error) {
+	s, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		e := s.Close()
+		if err == nil {
+			err = e
+		}
+	}()
+
+	d, err := os.Create(dst)
+	if err != nil {
+		// In case the file is a symlink, we need to remove the file before we can write to it.
+		if _, e := os.Lstat(dst); e == nil {
+			if e := os.Remove(dst); e != nil {
+				return e
+			}
+			d, err = os.Create(dst)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	defer func() {
+		e := d.Close()
+		if err == nil {
+			err = e
+		}
+	}()
+
+	_, err = io.Copy(d, s)
+	if err != nil {
+		return err
+	}
+
+	i, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	return os.Chmod(dst, i.Mode())
 }
