@@ -10,111 +10,120 @@ so TODO and FIXME. Heck I also give you a WORKAROUND.
 */
 
 import (
-	"fmt"
-	"go/build"
+	"iter"
 	"log"
 	"os"
-	"path"
-	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 
 	"github.com/leonidboykov/go-mutesting/internal/models"
 )
 
-func packagesWithFilesOfArgs(args []string, opts *models.Options) map[string]map[string]struct{} {
-	var filenames []string
-
+func FilesOfArgs(args []string, opts *models.Options) []string {
 	if len(args) == 0 {
-		filenames = append(filenames, checkDir(".")...)
-	} else {
-		for _, arg := range args {
-			if strings.HasSuffix(arg, "/...") && isDir(arg[:len(arg)-4]) {
-				for _, dirname := range allPackagesInFS(arg) {
-					filenames = append(filenames, checkDir(dirname)...)
-				}
-			} else if isDir(arg) {
-				filenames = append(filenames, checkDir(arg)...)
-			} else if exists(arg) {
-				filenames = append(filenames, arg)
-			} else {
-				for _, pkgname := range importPaths([]string{arg}) {
-					filenames = append(filenames, checkPackage(pkgname)...)
-				}
+		args = []string{"."}
+	}
+	pkgs, err := packages.Load(&packages.Config{
+		Mode:  packages.LoadFiles,
+		Tests: false,
+	}, args...)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	var files []string
+	for _, p := range pkgs {
+		iter := skipExcludedDirs(
+			removeDuplicates(slices.Values(p.GoFiles)),
+			opts.Config.ExcludeDirs,
+		)
+		if opts.Config.SkipFileWithoutTest || opts.Config.SkipFileWithBuildTag {
+			iter = skipFilesWithoutTests(iter)
+			if opts.Config.SkipFileWithBuildTag {
+				iter = skipFilesWithBuildTag(iter)
 			}
 		}
+		files = append(files, slices.Collect(iter)...)
 	}
+	return files
+}
 
-	fileLookup := make(map[string]struct{})
-	pkgs := make(map[string]map[string]struct{})
-	var re *regexp.Regexp
-	if opts.Config.SkipFileWithBuildTag {
-		re = regexp.MustCompile("\\+build (.*)(\\s+)package") //nolint:gosimple
-	}
-
-	for _, filename := range filenames {
-		if _, ok := fileLookup[filename]; ok {
-			continue
-		}
-
-		if len(opts.Config.ExcludeDirs) > 0 { // ignore files in excluded dirs
-			dirIsExcluded := false
-			for _, exDir := range opts.Config.ExcludeDirs {
-				if strings.HasPrefix(filename, exDir) {
-					dirIsExcluded = true
-					break
-				}
-			}
-
-			if dirIsExcluded {
+func removeDuplicates(files iter.Seq[string]) iter.Seq[string] {
+	m := make(map[string]struct{})
+	return func(yield func(string) bool) {
+		for filename := range files {
+			if _, ok := m[filename]; ok {
 				continue
 			}
+			m[filename] = struct{}{}
+			if !yield(filename) {
+				return
+			}
 		}
+	}
+}
 
-		if strings.HasSuffix(filename, "_test.go") { // ignore test files
-			continue
+func skipExcludedDirs(files iter.Seq[string], excludedDirs []string) iter.Seq[string] {
+	return func(yield func(string) bool) {
+	OUTER_LOOP:
+		for filename := range files {
+			for _, dir := range excludedDirs {
+				// TODO: Replace with [strings.HasPrefix] in case of errors.
+				if strings.Contains(filename, dir) {
+					continue OUTER_LOOP
+				}
+			}
+			if !yield(filename) {
+				return
+			}
 		}
+	}
+}
 
-		if opts.Config.SkipFileWithoutTest || opts.Config.SkipFileWithBuildTag { // ignore files without tests
+func skipFilesWithoutTests(files iter.Seq[string]) iter.Seq[string] {
+	const extLen = len(".go")
+	return func(yield func(string) bool) {
+		for filename := range files {
 			nameSize := len(filename)
 			if nameSize <= 3 {
 				continue
 			}
-
-			testName := filename[:nameSize-3] + "_test.go"
-			if !exists(testName) {
+			testFileName := filename[:nameSize-extLen] + "_test.go"
+			if !exists(testFileName) {
 				continue
 			}
-
-			if opts.Config.SkipFileWithBuildTag { // ignore files with test with build tags
-				isBuildTag := regexpSearchInFile(testName, re)
-				if isBuildTag {
-					continue
-				}
+			if !yield(filename) {
+				return
 			}
 		}
-
-		if !exists(filename) {
-			fmt.Printf("%q does not exist", filename)
-
-			continue
-		}
-		fileLookup[filename] = struct{}{}
-
-		pkgName := path.Dir(filename)
-
-		pkg, ok := pkgs[pkgName]
-		if !ok {
-			pkg = make(map[string]struct{})
-
-			pkgs[pkgName] = pkg
-		}
-
-		pkg[filename] = struct{}{}
 	}
+}
 
-	return pkgs
+func skipFilesWithBuildTag(files iter.Seq[string]) iter.Seq[string] {
+	const extLen = len(".go")
+	re := regexp.MustCompile(`\+build (.*)(\s+)package`)
+	return func(yield func(string) bool) {
+		for filename := range files {
+			nameSize := len(filename)
+			if nameSize <= 3 {
+				continue
+			}
+			testFileName := filename[:nameSize-extLen] + "_test.go"
+			if regexpSearchInFile(testFileName, re) {
+				continue
+			}
+			if !yield(filename) {
+				return
+			}
+		}
+	}
+}
+
+func exists(filename string) bool {
+	_, err := os.Stat(filename)
+	return err == nil
 }
 
 func regexpSearchInFile(file string, re *regexp.Regexp) bool {
@@ -124,128 +133,4 @@ func regexpSearchInFile(file string, re *regexp.Regexp) bool {
 	}
 
 	return re.MatchString(string(contents))
-}
-
-// FilesOfArgs returns all available Go files given a list of packages, directories and files which can embed patterns.
-func FilesOfArgs(args []string, opts *models.Options) []string {
-	pkgs := packagesWithFilesOfArgs(args, opts)
-
-	pkgsNames := make([]string, 0, len(pkgs))
-	for name := range pkgs {
-		pkgsNames = append(pkgsNames, name)
-	}
-	sort.Strings(pkgsNames)
-
-	var files []string
-
-	for _, name := range pkgsNames {
-		var filenames []string
-		for name := range pkgs[name] {
-			filenames = append(filenames, name)
-		}
-		sort.Strings(filenames)
-
-		files = append(files, filenames...)
-	}
-
-	return files
-}
-
-// Package holds file information of a package.
-type Package struct {
-	Name  string
-	Files []string
-}
-
-// Packages defines a list of packages.
-type Packages []Package
-
-// Len is the number of elements in the collection.
-func (p Packages) Len() int { return len(p) }
-
-// Swap swaps the elements with indexes i and j.
-func (p Packages) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
-
-// PackagesByName sorts a list of packages by their name.
-type PackagesByName struct{ Packages }
-
-// Less reports whether the element with index i should sort before the element with index j.
-func (p PackagesByName) Less(i, j int) bool { return p.Packages[i].Name < p.Packages[j].Name }
-
-// PackagesWithFilesOfArgs returns all available Go files sorted by their packages given a list of packages, directories and files which can embed patterns.
-func PackagesWithFilesOfArgs(args []string, opts *models.Options) []Package {
-	pkgs := packagesWithFilesOfArgs(args, opts)
-
-	r := make([]Package, 0, len(pkgs))
-	for name := range pkgs {
-		r = append(r, Package{
-			Name: name,
-		})
-	}
-	sort.Sort(PackagesByName{r})
-
-	for i := range r {
-		var filenames []string
-		for name := range pkgs[r[i].Name] {
-			filenames = append(filenames, name)
-		}
-		sort.Strings(filenames)
-
-		r[i].Files = filenames
-	}
-
-	return r
-}
-
-func isDir(filename string) bool {
-	fi, err := os.Stat(filename)
-	return err == nil && fi.IsDir()
-}
-
-func exists(filename string) bool {
-	_, err := os.Stat(filename)
-	return err == nil
-}
-
-func checkDir(dirname string) []string {
-	pkg, err := build.ImportDir(dirname, 0)
-
-	return checkImportedPackage(pkg, err)
-}
-
-func checkPackage(pkgname string) []string {
-	pkg, err := build.Import(pkgname, ".", 0)
-
-	return checkImportedPackage(pkg, err)
-}
-
-func checkImportedPackage(pkg *build.Package, err error) []string {
-	if err != nil {
-		if _, nogo := err.(*build.NoGoError); nogo {
-			// Don't complain if the failure is due to no Go source files.
-			return []string{}
-		}
-		_, err := fmt.Fprintln(os.Stderr, err)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		return []string{}
-	}
-
-	var files []string
-
-	files = append(files, pkg.GoFiles...)
-
-	joinDirWithFilenames(pkg.Dir, files)
-
-	return files
-}
-
-func joinDirWithFilenames(dir string, files []string) {
-	if dir != "." {
-		for i, f := range files {
-			files[i] = filepath.Join(dir, f)
-		}
-	}
 }
