@@ -93,19 +93,19 @@ func checkArguments(args []string, opts *models.Options) (bool, int) {
 	return false, 0
 }
 
-func debug(opts *models.Options, format string, args ...interface{}) {
+func debug(opts *models.Options, format string, args ...any) {
 	if opts.General.Debug {
 		fmt.Printf(format+"\n", args...)
 	}
 }
 
-func verbose(opts *models.Options, format string, args ...interface{}) {
+func verbose(opts *models.Options, format string, args ...any) {
 	if opts.General.Verbose || opts.General.Debug {
 		fmt.Printf(format+"\n", args...)
 	}
 }
 
-func exitError(format string, args ...interface{}) int {
+func exitError(format string, args ...any) int {
 	_, _ = fmt.Fprintf(os.Stderr, format+"\n", args...)
 
 	return returnError
