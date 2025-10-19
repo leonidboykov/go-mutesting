@@ -10,6 +10,7 @@ so TODO and FIXME. Heck I also give you a WORKAROUND.
 */
 
 import (
+	"fmt"
 	"iter"
 	"log"
 	"os"
@@ -22,7 +23,7 @@ import (
 	"github.com/leonidboykov/go-mutesting/internal/models"
 )
 
-func FilesOfArgs(args []string, opts *models.Options) []string {
+func FilesOfArgs(args []string, opts *models.Options) ([]string, error) {
 	if len(args) == 0 {
 		args = []string{"."}
 	}
@@ -31,7 +32,7 @@ func FilesOfArgs(args []string, opts *models.Options) []string {
 		Tests: false,
 	}, args...)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, fmt.Errorf("load packages: %w", err)
 	}
 	var files []string
 	for _, p := range pkgs {
@@ -47,7 +48,7 @@ func FilesOfArgs(args []string, opts *models.Options) []string {
 		}
 		files = append(files, slices.Collect(iter)...)
 	}
-	return files
+	return files, nil
 }
 
 func removeDuplicates(files iter.Seq[string]) iter.Seq[string] {

@@ -124,7 +124,10 @@ func mainCmd(args []string) int {
 		return exitCode
 	}
 
-	files := importing.FilesOfArgs(opts.Remaining.Targets, opts)
+	files, err := importing.FilesOfArgs(opts.Remaining.Targets, opts)
+	if err != nil {
+		return exitError("Could not load packages: %s", err)
+	}
 	if len(files) == 0 {
 		return exitError("Could not find any suitable Go source files")
 	}
@@ -159,7 +162,7 @@ func mainCmd(args []string) int {
 				return exitError("Cannot read blacklist file %q: %v", f, err)
 			}
 
-			for _, line := range strings.Split(string(c), "\n") {
+			for line := range strings.SplitSeq(string(c), "\n") {
 				if line == "" {
 					continue
 				}

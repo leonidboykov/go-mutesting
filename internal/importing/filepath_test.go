@@ -70,7 +70,7 @@ func TestFilesOfArgs(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			var opts = &models.Options{}
-			got := FilesOfArgs(test.args, opts)
+			got, _ := FilesOfArgs(test.args, opts)
 
 			assert.Equal(t, test.expect, cleanupPaths(t, got), fmt.Sprintf("With args: %#v", test.args))
 		})
@@ -115,7 +115,7 @@ func TestFilesWithSkipWithoutTests(t *testing.T) {
 			t.Parallel()
 			var opts = &models.Options{}
 			opts.Config.SkipFileWithoutTest = true
-			got := FilesOfArgs(test.args, opts)
+			got, _ := FilesOfArgs(test.args, opts)
 
 			assert.Equal(t, test.expect, cleanupPaths(t, got), fmt.Sprintf("With args: %#v", test.args))
 		})
@@ -161,7 +161,7 @@ func TestFilesWithSkipWithBuildTagsTests(t *testing.T) {
 			t.Parallel()
 			var opts = &models.Options{}
 			opts.Config.SkipFileWithBuildTag = true
-			got := FilesOfArgs(test.args, opts)
+			got, _ := FilesOfArgs(test.args, opts)
 
 			assert.Equal(t, test.expect, cleanupPaths(t, got), fmt.Sprintf("With args: %#v", test.args))
 		})
@@ -242,7 +242,7 @@ func TestFilesWithExcludedDirs(t *testing.T) {
 			var opts = &models.Options{}
 			opts.Config.ExcludeDirs = test.config
 
-			got := FilesOfArgs(test.args, opts)
+			got, _ := FilesOfArgs(test.args, opts)
 
 			assert.Equal(t, test.expect, cleanupPaths(t, got), fmt.Sprintf("With args: %#v", test.args))
 		})
