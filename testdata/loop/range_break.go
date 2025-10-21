@@ -1,14 +1,11 @@
-//go:build examplemain
-// +build examplemain
-
-package main
+package loop
 
 import (
 	"fmt"
 	"runtime"
 )
 
-func main() {
+func rangeBreak() {
 	var pow = []int{1, 2, 4, 8, 16, 32, 64, 128}
 
 	for i, v := range pow {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/printer"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,14 +40,16 @@ func Mutator(t *testing.T, m mutator.Mutator, testFile string, count int) {
 	// Mutate all relevant nodes -> test whole mutation process
 	changed := mutesting.MutateWalk(pkg, info, fset, src, m, skippedLines)
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		assert.True(t, <-changed)
 
 		buf := new(bytes.Buffer)
 		err = printer.Fprint(buf, fset, src)
 		assert.Nil(t, err)
 
-		changedFilename := fmt.Sprintf("%s.%d.go", testFile, i)
+		dir := filepath.Dir(testFile)
+		fname := filepath.Base(testFile)
+		changedFilename := fmt.Sprintf("%s/_%s.%d.go", dir, fname, i)
 		changedFile, err := os.ReadFile(changedFilename)
 		assert.Nil(t, err)
 

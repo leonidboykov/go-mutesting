@@ -1,11 +1,8 @@
-//go:build examplemain
-// +build examplemain
-
-package main
+package conditional
 
 import "fmt"
 
-func main() {
+func negated() {
 	i := 1
 	j := 2
 

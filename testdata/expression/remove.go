@@ -1,13 +1,10 @@
-//go:build examplemain
-// +build examplemain
-
-package main
+package expression
 
 import (
 	"fmt"
 )
 
-func main() {
+func remove() {
 	i := 1
 
 	for i != 4 {

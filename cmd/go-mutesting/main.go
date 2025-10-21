@@ -19,7 +19,7 @@ import (
 	"strings"
 	"syscall"
 
-	"gopkg.in/yaml.v3"
+	"github.com/goccy/go-yaml"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/leonidboykov/go-mutesting/internal/importing"
@@ -86,26 +86,26 @@ func checkArguments(args []string, opts *models.Options) (bool, int) {
 		}
 		err = yaml.Unmarshal(yamlFile, &opts.Config)
 		if err != nil {
-			return true, exitError("Could not unmarshall config file: %q, %v", opts.General.Config, err)
+			return true, exitError("Could not unmarshal config file: %q, %v", opts.General.Config, err)
 		}
 	}
 
 	return false, 0
 }
 
-func debug(opts *models.Options, format string, args ...interface{}) {
+func debug(opts *models.Options, format string, args ...any) {
 	if opts.General.Debug {
 		fmt.Printf(format+"\n", args...)
 	}
 }
 
-func verbose(opts *models.Options, format string, args ...interface{}) {
+func verbose(opts *models.Options, format string, args ...any) {
 	if opts.General.Verbose || opts.General.Debug {
 		fmt.Printf(format+"\n", args...)
 	}
 }
 
-func exitError(format string, args ...interface{}) int {
+func exitError(format string, args ...any) int {
 	_, _ = fmt.Fprintf(os.Stderr, format+"\n", args...)
 
 	return returnError
@@ -124,7 +124,10 @@ func mainCmd(args []string) int {
 		return exitCode
 	}
 
-	files := importing.FilesOfArgs(opts.Remaining.Targets, opts)
+	files, err := importing.FilesOfArgs(opts.Remaining.Targets, opts)
+	if err != nil {
+		return exitError("Could not load packages: %s", err)
+	}
 	if len(files) == 0 {
 		return exitError("Could not find any suitable Go source files")
 	}
@@ -159,7 +162,7 @@ func mainCmd(args []string) int {
 				return exitError("Cannot read blacklist file %q: %v", f, err)
 			}
 
-			for _, line := range strings.Split(string(c), "\n") {
+			for line := range strings.SplitSeq(string(c), "\n") {
 				if line == "" {
 					continue
 				}

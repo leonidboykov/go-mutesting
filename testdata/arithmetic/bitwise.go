@@ -1,11 +1,8 @@
-//go:build examplemain
-// +build examplemain
-
-package main
+package arithmetic
 
 import "fmt"
 
-func main() {
+func bitwise() {
 	i := 100
 	j := 200
 

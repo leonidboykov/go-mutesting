@@ -1,11 +1,8 @@
-//go:build examplemain
-// +build examplemain
-
-package main
+package expression
 
 import "fmt"
 
-func main() {
+func comparison() {
 	if 1 > 2 {
 		fmt.Printf("1 is greater than 2!")
 	}

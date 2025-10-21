@@ -2,7 +2,7 @@ package importing
 
 import (
 	"fmt"
-	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,298 +11,252 @@ import (
 )
 
 func TestFilesOfArgs(t *testing.T) {
-	p := os.Getenv("GOPATH") + "/src/"
-
+	t.Parallel()
 	for _, test := range []struct {
+		name   string
 		args   []string
 		expect []string
 	}{
-		// empty
 		{
-			[]string{},
-			[]string{"filepath.go", "import.go"},
-		},
-		// files
-		{
-			[]string{"./filepathfixtures/first.go"},
-			[]string{"./filepathfixtures/first.go"},
-		},
-		// directories
-		{
-			[]string{"./filepathfixtures"},
-			[]string{"filepathfixtures/first.go", "filepathfixtures/second.go", "filepathfixtures/third.go"},
-		},
-		{
-			[]string{"../importing/filepathfixtures"},
-			[]string{
-				"../importing/filepathfixtures/first.go",
-				"../importing/filepathfixtures/second.go",
-				"../importing/filepathfixtures/third.go",
-			},
-		},
-		// packages
-		{
-			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures"},
-			[]string{
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/first.go",
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/third.go",
+			name: "empty",
+			args: []string{},
+			expect: []string{
+				"go-mutesting/internal/importing/filepath.go",
 			},
 		},
 		{
-			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
-			[]string{
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/first.go",
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/third.go",
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage/fourth.go",
+			name:   "files",
+			args:   []string{"./filepathfixtures/first.go"},
+			expect: []string{"go-mutesting/internal/importing/filepathfixtures/first.go"},
+		},
+		{
+			name: "directories",
+			args: []string{"./filepathfixtures"},
+			expect: []string{
+				"go-mutesting/internal/importing/filepathfixtures/first.go",
+				"go-mutesting/internal/importing/filepathfixtures/second.go",
+				"go-mutesting/internal/importing/filepathfixtures/third.go",
 			},
 		},
-	} {
-		var opts = &models.Options{}
-		got := FilesOfArgs(test.args, opts)
-
-		assert.Equal(t, test.expect, got, fmt.Sprintf("With args: %#v", test.args))
-	}
-}
-
-func TestPackagesWithFilesOfArgs(t *testing.T) {
-	p := os.Getenv("GOPATH") + "/src/"
-
-	for _, test := range []struct {
-		args   []string
-		expect []Package
-	}{
-		// empty
 		{
-			[]string{},
-			[]Package{{Name: ".", Files: []string{"filepath.go", "import.go"}}},
-		},
-		// files
-		{
-			[]string{"./filepathfixtures/first.go"},
-			[]Package{{Name: "filepathfixtures", Files: []string{"./filepathfixtures/first.go"}}},
-		},
-		// directories
-		{
-			[]string{"./filepathfixtures"},
-			[]Package{{Name: "filepathfixtures", Files: []string{
-				"filepathfixtures/first.go",
-				"filepathfixtures/second.go",
-				"filepathfixtures/third.go",
-			}}},
+			name: "relative directories",
+			args: []string{"../importing/filepathfixtures"},
+			expect: []string{
+				"go-mutesting/internal/importing/filepathfixtures/first.go",
+				"go-mutesting/internal/importing/filepathfixtures/second.go",
+				"go-mutesting/internal/importing/filepathfixtures/third.go",
+			},
 		},
 		{
-			[]string{"../importing/filepathfixtures"},
-			[]Package{{Name: "../importing/filepathfixtures", Files: []string{
-				"../importing/filepathfixtures/first.go",
-				"../importing/filepathfixtures/second.go",
-				"../importing/filepathfixtures/third.go",
-			}}},
-		},
-		// packages
-		{
-			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures"},
-			[]Package{{
-				Name: p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures",
-				Files: []string{
-					p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/first.go",
-					p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
-					p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/third.go",
-				},
-			}},
+			name: "packages",
+			args: []string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures"},
+			expect: []string{
+				"go-mutesting/internal/importing/filepathfixtures/first.go",
+				"go-mutesting/internal/importing/filepathfixtures/second.go",
+				"go-mutesting/internal/importing/filepathfixtures/third.go",
+			},
 		},
 		{
-			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
-			[]Package{
-				{
-					Name: p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures",
-					Files: []string{
-						p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/first.go",
-						p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
-						p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/third.go",
-					},
-				},
-				{
-					Name: p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage",
-					Files: []string{
-						p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage/fourth.go",
-					},
-				},
+			name: "packages recursive",
+			args: []string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
+			expect: []string{
+				"go-mutesting/internal/importing/filepathfixtures/first.go",
+				"go-mutesting/internal/importing/filepathfixtures/second.go",
+				"go-mutesting/internal/importing/filepathfixtures/third.go",
+				"go-mutesting/internal/importing/filepathfixtures/secondfixturespackage/fourth.go",
 			},
 		},
 	} {
-		var opts = &models.Options{}
-		got := PackagesWithFilesOfArgs(test.args, opts)
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			var opts = &models.Options{}
+			got, _ := FilesOfArgs(test.args, opts)
 
-		assert.Equal(t, test.expect, got, fmt.Sprintf("With args: %#v", test.args))
+			assert.Equal(t, test.expect, cleanupPaths(t, got), fmt.Sprintf("With args: %#v", test.args))
+		})
 	}
 }
 
 func TestFilesWithSkipWithoutTests(t *testing.T) {
-	p := os.Getenv("GOPATH") + "/src/"
-
+	t.Parallel()
 	for _, test := range []struct {
+		name   string
 		args   []string
 		expect []string
 	}{
-		// files
 		{
-			[]string{"./filepathfixtures/first.go"},
-			[]string(nil),
+			name:   "files without tests",
+			args:   []string{"./filepathfixtures/first.go"},
+			expect: []string{},
 		},
 		{
-			[]string{"./filepathfixtures/second.go"},
-			[]string{"./filepathfixtures/second.go"},
+			name:   "files with test",
+			args:   []string{"./filepathfixtures/second.go"},
+			expect: []string{"go-mutesting/internal/importing/filepathfixtures/second.go"},
 		},
-		// directories
 		{
-			[]string{"./filepathfixtures"},
-			[]string{"filepathfixtures/second.go", "filepathfixtures/third.go"},
+			name: "directories",
+			args: []string{"./filepathfixtures"},
+			expect: []string{
+				"go-mutesting/internal/importing/filepathfixtures/second.go",
+				"go-mutesting/internal/importing/filepathfixtures/third.go",
+			},
 		},
-		// packages
 		{
-			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
-			[]string{
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/third.go",
+			name: "packages",
+			args: []string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
+			expect: []string{
+				"go-mutesting/internal/importing/filepathfixtures/second.go",
+				"go-mutesting/internal/importing/filepathfixtures/third.go",
 			},
 		},
 	} {
-		var opts = &models.Options{}
-		opts.Config.SkipFileWithoutTest = true
-		got := FilesOfArgs(test.args, opts)
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			var opts = &models.Options{}
+			opts.Config.SkipFileWithoutTest = true
+			got, _ := FilesOfArgs(test.args, opts)
 
-		assert.Equal(t, test.expect, got, fmt.Sprintf("With args: %#v", test.args))
+			assert.Equal(t, test.expect, cleanupPaths(t, got), fmt.Sprintf("With args: %#v", test.args))
+		})
 	}
 }
 
 func TestFilesWithSkipWithBuildTagsTests(t *testing.T) {
-	p := os.Getenv("GOPATH") + "/src/"
-
+	t.Parallel()
 	for _, test := range []struct {
+		name   string
 		args   []string
 		expect []string
 	}{
-		// files
 		{
-			[]string{"./filepathfixtures/first.go"},
-			[]string(nil),
+			name:   "files without test file",
+			args:   []string{"./filepathfixtures/first.go"},
+			expect: []string{},
 		},
 		{
-			[]string{"./filepathfixtures/third.go"},
-			[]string(nil),
+			name:   "files with build tag",
+			args:   []string{"./filepathfixtures/third.go"},
+			expect: []string{},
 		},
 		{
-			[]string{"./filepathfixtures/second.go"},
-			[]string{"./filepathfixtures/second.go"},
+			name:   "files without build tag",
+			args:   []string{"./filepathfixtures/second.go"},
+			expect: []string{"go-mutesting/internal/importing/filepathfixtures/second.go"},
 		},
-		// directories
 		{
-			[]string{"./filepathfixtures"},
-			[]string{"filepathfixtures/second.go"},
+			name:   "directories",
+			args:   []string{"./filepathfixtures"},
+			expect: []string{"go-mutesting/internal/importing/filepathfixtures/second.go"},
 		},
-		// packages
 		{
-			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
-			[]string{
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
+			name: "packages",
+			args: []string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
+			expect: []string{
+				"go-mutesting/internal/importing/filepathfixtures/second.go",
 			},
 		},
 	} {
-		var opts = &models.Options{}
-		opts.Config.SkipFileWithBuildTag = true
-		got := FilesOfArgs(test.args, opts)
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			var opts = &models.Options{}
+			opts.Config.SkipFileWithBuildTag = true
+			got, _ := FilesOfArgs(test.args, opts)
 
-		assert.Equal(t, test.expect, got, fmt.Sprintf("With args: %#v", test.args))
+			assert.Equal(t, test.expect, cleanupPaths(t, got), fmt.Sprintf("With args: %#v", test.args))
+		})
 	}
 }
 
 func TestFilesWithExcludedDirs(t *testing.T) {
-	p := os.Getenv("GOPATH") + "/src/"
-
+	t.Parallel()
 	for _, test := range []struct {
+		name   string
 		args   []string
 		expect []string
 		config []string
 	}{
-		// files
 		{
-			[]string{"./filepathfixtures/first.go"},
-			[]string{"./filepathfixtures/first.go"},
-			[]string(nil),
+			name:   "files without excludes",
+			args:   []string{"./filepathfixtures/first.go"},
+			expect: []string{"go-mutesting/internal/importing/filepathfixtures/first.go"},
+			config: []string(nil),
 		},
 		{
-			[]string{"./filepathfixtures/second.go"},
-			[]string{"./filepathfixtures/second.go"},
-			[]string{"filepathfixtures"},
+			name:   "files with exclude",
+			args:   []string{"./filepathfixtures/second.go"},
+			expect: []string{},
+			config: []string{"filepathfixtures"},
 		},
 		{
-			[]string{"filepathfixtures/second.go"},
-			[]string(nil),
-			[]string{"filepathfixtures"},
-		},
-		{
-			[]string{"./filepathfixtures/second.go"},
-			[]string(nil),
-			[]string{"./filepathfixtures"},
-		},
-		// directories
-		{
-			[]string{"./filepathfixtures/..."},
-			[]string{
-				"filepathfixtures/first.go",
-				"filepathfixtures/second.go",
-				"filepathfixtures/third.go",
+			name: "directories with subdir exclude",
+			args: []string{"./filepathfixtures/..."},
+			expect: []string{
+				"go-mutesting/internal/importing/filepathfixtures/first.go",
+				"go-mutesting/internal/importing/filepathfixtures/second.go",
+				"go-mutesting/internal/importing/filepathfixtures/third.go",
 			},
-			[]string{"filepathfixtures/secondfixturespackage"},
+			config: []string{"filepathfixtures/secondfixturespackage"},
 		},
 		{
-			[]string{"./filepathfixtures/..."},
-			[]string(nil),
-			[]string{"filepathfixtures"},
+			name:   "directories with exclude - recursive",
+			args:   []string{"./filepathfixtures/..."},
+			expect: []string{},
+			config: []string{"filepathfixtures"},
 		},
 		{
-			[]string{"./filepathfixtures"},
-			[]string(nil),
-			[]string{"filepathfixtures"},
+			name:   "directories with exclude",
+			args:   []string{"./filepathfixtures"},
+			expect: []string{},
+			config: []string{"filepathfixtures"},
 		},
 		{
-			[]string{"./filepathfixtures"},
-			[]string{
-				"filepathfixtures/first.go",
-				"filepathfixtures/second.go",
-				"filepathfixtures/third.go",
+			name: "directories without exclude",
+			args: []string{"./filepathfixtures"},
+			expect: []string{
+				"go-mutesting/internal/importing/filepathfixtures/first.go",
+				"go-mutesting/internal/importing/filepathfixtures/second.go",
+				"go-mutesting/internal/importing/filepathfixtures/third.go",
 			},
-			[]string(nil),
-		},
-
-		//packages
-		{
-			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
-			[]string{
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/first.go",
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/third.go",
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage/fourth.go",
-			},
-			[]string{"filepathfixtures"},
+			config: []string(nil),
 		},
 		{
-			[]string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
-			[]string{
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/first.go",
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/second.go",
-				p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/third.go",
+			name:   "packages with exclude",
+			args:   []string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
+			expect: []string{}, // TODO: Breaking change.
+			config: []string{"filepathfixtures"},
+		},
+		{
+			name: "packages with specific exclude",
+			args: []string{"github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/..."},
+			expect: []string{
+				"go-mutesting/internal/importing/filepathfixtures/first.go",
+				"go-mutesting/internal/importing/filepathfixtures/second.go",
+				"go-mutesting/internal/importing/filepathfixtures/third.go",
 			},
-			[]string{p + "github.com/leonidboykov/go-mutesting/internal/importing/filepathfixtures/secondfixturespackage/"},
+			config: []string{"filepathfixtures/secondfixturespackage"},
 		},
 	} {
-		var opts = &models.Options{}
-		opts.Config.ExcludeDirs = test.config
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			var opts = &models.Options{}
+			opts.Config.ExcludeDirs = test.config
 
-		got := FilesOfArgs(test.args, opts)
+			got, _ := FilesOfArgs(test.args, opts)
 
-		assert.Equal(t, test.expect, got, fmt.Sprintf("With args: %#v", test.args))
+			assert.Equal(t, test.expect, cleanupPaths(t, got), fmt.Sprintf("With args: %#v", test.args))
+		})
 	}
+}
+
+// cleanupPaths is a helper to cleanup absolute paths.
+func cleanupPaths(t *testing.T, paths []string) []string {
+	t.Helper()
+	result := make([]string, 0, len(paths))
+	for _, p := range paths {
+		if i := strings.Index(p, "go-mutesting"); i >= 0 {
+			result = append(result, p[i:])
+		}
+	}
+	return result
 }

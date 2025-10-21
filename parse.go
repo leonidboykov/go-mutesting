@@ -1,86 +1,34 @@
 package mutesting
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
-	"go/build"
-	"go/parser"
 	"go/token"
 	"go/types"
-	"os"
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/tools/go/loader" //nolint:staticcheck
+	//nolint:staticcheck
+	"golang.org/x/tools/go/packages"
 )
 
-// ParseFile parses the content of the given file and returns the corresponding ast.File node and its file set for positional information.
+// ParseFile parses the content of the given file and returns the corresponding [ast.File] node and its file set for positional information.
 // If a fatal error is encountered the error return argument is not nil.
-func ParseFile(file string) (*ast.File, *token.FileSet, error) {
-	data, err := os.ReadFile(file)
+func ParseFile(filename string) (*ast.File, *token.FileSet, error) {
+	pkg, src, err := parseFile(filename)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("parse file: %w", err)
 	}
-
-	return ParseSource(data)
+	return src, pkg.Fset, err
 }
 
-// ParseSource parses the given source and returns the corresponding ast.File node and its file set for positional information.
-// If a fatal error is encountered the error return argument is not nil.
-func ParseSource(data interface{}) (*ast.File, *token.FileSet, error) {
-	fset := token.NewFileSet()
-
-	src, err := parser.ParseFile(fset, "", data, parser.ParseComments|parser.AllErrors)
+func ParseAndTypeCheckFile(filename string) (*ast.File, *token.FileSet, *types.Package, *types.Info, error) {
+	pkg, src, err := parseFile(filename)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, fmt.Errorf("parse file: %w", err)
 	}
-
-	return src, fset, err
-}
-
-// ParseAndTypeCheckFile parses and type-checks the given file, and returns everything interesting about the file.
-// If a fatal error is encountered the error return argument is not nil.
-func ParseAndTypeCheckFile(file string) (*ast.File, *token.FileSet, *types.Package, *types.Info, error) {
-	fileAbs, err := filepath.Abs(file)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("Could not absolute the file path of %q: %v", file, err)
-	}
-	dir := filepath.Dir(fileAbs)
-
-	buildPkg, err := build.ImportDir(dir, build.FindOnly)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("Could not create build package of %q: %v", file, err)
-	}
-
-	var conf = loader.Config{
-		ParserMode: parser.AllErrors | parser.ParseComments,
-	}
-
-	if buildPkg.ImportPath != "." {
-		conf.Import(buildPkg.ImportPath)
-	} else {
-		// This is most definitely the case for files inside a "testdata" package
-		conf.CreateFromFilenames(dir, fileAbs)
-	}
-
-	conf.AllowErrors = true
-	prog, err := conf.Load()
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("Could not load package of file %q: %v", file, err)
-	}
-
-	pkgInfo := prog.InitialPackages()[0]
-
-	var src *ast.File
-	for _, f := range pkgInfo.Files {
-		if prog.Fset.Position(f.Pos()).Filename == fileAbs {
-			src = f
-
-			break
-		}
-	}
-
-	return src, prog.Fset, pkgInfo.Pkg, &pkgInfo.Info, nil
+	return src, pkg.Fset, pkg.Types, pkg.TypesInfo, nil
 }
 
 // Skips checks all comments and finds `//nomutesting` directives.
@@ -95,4 +43,35 @@ func Skips(fset *token.FileSet, f *ast.File) map[int]struct{} {
 		}
 	}
 	return skippedLines
+}
+
+func parseFile(filename string) (*packages.Package, *ast.File, error) {
+	filenameAbs, err := filepath.Abs(filename)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get abs filename: %w", err)
+	}
+
+	pkgs, err := packages.Load(&packages.Config{
+		Mode: packages.LoadSyntax,
+	}, filepath.Dir(filenameAbs))
+	if err != nil {
+		return nil, nil, fmt.Errorf("load package: %w", err)
+	}
+	if len(pkgs) == 0 {
+		return nil, nil, errors.New("no packages")
+	}
+
+	pkg := pkgs[0]
+
+	var src *ast.File
+	for _, f := range pkg.Syntax {
+		if pkg.Fset.Position(f.Pos()).Filename == filenameAbs {
+			src = f
+			break
+		}
+	}
+	if src == nil {
+		return nil, nil, errors.New("syntax file not found")
+	}
+	return pkg, src, nil
 }

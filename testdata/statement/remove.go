@@ -1,7 +1,4 @@
-//go:build examplemain
-// +build examplemain
-
-package example
+package statement
 
 import (
 	"fmt"
