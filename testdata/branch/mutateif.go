@@ -1,13 +1,10 @@
-//go:build examplemain
-// +build examplemain
-
-package main
+package branch
 
 import (
 	"fmt"
 )
 
-func main() {
+func mutateif() {
 	i := 1
 
 	for i != 4 {

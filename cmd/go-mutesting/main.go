@@ -86,7 +86,7 @@ func checkArguments(args []string, opts *models.Options) (bool, int) {
 		}
 		err = yaml.Unmarshal(yamlFile, &opts.Config)
 		if err != nil {
-			return true, exitError("Could not unmarshall config file: %q, %v", opts.General.Config, err)
+			return true, exitError("Could not unmarshal config file: %q, %v", opts.General.Config, err)
 		}
 	}
 

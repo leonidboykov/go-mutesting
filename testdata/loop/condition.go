@@ -1,11 +1,8 @@
-//go:build examplemain
-// +build examplemain
-
-package main
+package loop
 
 import "fmt"
 
-func main() {
+func condition() {
 	k := 0
 
 	for k < 100 {

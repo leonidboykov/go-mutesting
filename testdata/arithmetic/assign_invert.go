@@ -1,11 +1,8 @@
-//go:build examplemain
-// +build examplemain
-
-package main
+package arithmetic
 
 import "fmt"
 
-func main() {
+func assign() {
 	i := 100
 
 	i += 10

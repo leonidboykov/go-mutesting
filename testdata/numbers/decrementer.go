@@ -1,11 +1,8 @@
-//go:build examplemain
-// +build examplemain
-
-package main
+package numbers
 
 import "fmt"
 
-func main() {
+func decrementer() {
 	k := 100
 	m := 10.1
 
