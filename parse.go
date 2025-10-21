@@ -1,6 +1,7 @@
 package mutesting
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -14,31 +15,18 @@ import (
 
 // ParseFile parses the content of the given file and returns the corresponding [ast.File] node and its file set for positional information.
 // If a fatal error is encountered the error return argument is not nil.
-func ParseFile(file string) (*ast.File, *token.FileSet, error) {
-	pkgs, err := packages.Load(&packages.Config{Mode: packages.LoadSyntax}, file)
+func ParseFile(filename string) (*ast.File, *token.FileSet, error) {
+	pkg, src, err := parseFile(filename)
 	if err != nil {
-		return nil, nil, fmt.Errorf("load file: %w", err)
+		return nil, nil, fmt.Errorf("parse file: %w", err)
 	}
-	// TODO: this may lead to panic.
-	return pkgs[0].Syntax[0], pkgs[0].Fset, err
+	return src, pkg.Fset, err
 }
 
-func ParseAndTypeCheckFile(file string) (*ast.File, *token.FileSet, *types.Package, *types.Info, error) {
-	fileAbs, _ := filepath.Abs(file)
-	pkgs, err := packages.Load(&packages.Config{
-		Mode: packages.LoadSyntax,
-	}, filepath.Dir(fileAbs))
+func ParseAndTypeCheckFile(filename string) (*ast.File, *token.FileSet, *types.Package, *types.Info, error) {
+	pkg, src, err := parseFile(filename)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("load file: %w", err)
-	}
-	packages.PrintErrors(pkgs)
-	pkg := pkgs[0]
-	var src *ast.File
-	for _, f := range pkg.Syntax {
-		if pkg.Fset.Position(f.Pos()).Filename == fileAbs {
-			src = f
-			break
-		}
+		return nil, nil, nil, nil, fmt.Errorf("parse file: %w", err)
 	}
 	return src, pkg.Fset, pkg.Types, pkg.TypesInfo, nil
 }
@@ -55,4 +43,35 @@ func Skips(fset *token.FileSet, f *ast.File) map[int]struct{} {
 		}
 	}
 	return skippedLines
+}
+
+func parseFile(filename string) (*packages.Package, *ast.File, error) {
+	filenameAbs, err := filepath.Abs(filename)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get abs filename: %w", err)
+	}
+
+	pkgs, err := packages.Load(&packages.Config{
+		Mode: packages.LoadSyntax,
+	}, filepath.Dir(filenameAbs))
+	if err != nil {
+		return nil, nil, fmt.Errorf("load package: %w", err)
+	}
+	if len(pkgs) == 0 {
+		return nil, nil, errors.New("no packages")
+	}
+
+	pkg := pkgs[0]
+
+	var src *ast.File
+	for _, f := range pkg.Syntax {
+		if pkg.Fset.Position(f.Pos()).Filename == filenameAbs {
+			src = f
+			break
+		}
+	}
+	if src == nil {
+		return nil, nil, errors.New("syntax file not found")
+	}
+	return pkg, src, nil
 }
