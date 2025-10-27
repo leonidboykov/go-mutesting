@@ -12,6 +12,7 @@ import (
 	"github.com/leonidboykov/go-mutesting/internal/models"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMainSimple(t *testing.T) {
@@ -171,6 +172,10 @@ func testMain(t *testing.T, root string, opts options, expectedError string, con
 
 	out := <-bufChannel
 
-	assert.EqualError(t, exitErr, expectedError)
+	if expectedError == "" {
+		require.NoError(t, exitErr)
+	} else {
+		require.EqualError(t, exitErr, expectedError)
+	}
 	assert.Contains(t, out, contains)
 }
