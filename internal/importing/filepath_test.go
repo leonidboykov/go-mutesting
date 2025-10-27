@@ -6,8 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/leonidboykov/go-mutesting/internal/models"
 )
 
 func TestFilesOfArgs(t *testing.T) {
@@ -69,8 +67,7 @@ func TestFilesOfArgs(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			var opts = &models.Options{}
-			got, _ := FilesOfArgs(test.args, opts)
+			got, _ := FilesOfArgs(test.args, Options{})
 
 			assert.Equal(t, test.expect, cleanupPaths(t, got), fmt.Sprintf("With args: %#v", test.args))
 		})
@@ -113,9 +110,7 @@ func TestFilesWithSkipWithoutTests(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			var opts = &models.Options{}
-			opts.Config.SkipFileWithoutTest = true
-			got, _ := FilesOfArgs(test.args, opts)
+			got, _ := FilesOfArgs(test.args, Options{SkipFileWithoutTest: true})
 
 			assert.Equal(t, test.expect, cleanupPaths(t, got), fmt.Sprintf("With args: %#v", test.args))
 		})
@@ -159,9 +154,7 @@ func TestFilesWithSkipWithBuildTagsTests(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			var opts = &models.Options{}
-			opts.Config.SkipFileWithBuildTag = true
-			got, _ := FilesOfArgs(test.args, opts)
+			got, _ := FilesOfArgs(test.args, Options{SkipFileWithBuildTag: true})
 
 			assert.Equal(t, test.expect, cleanupPaths(t, got), fmt.Sprintf("With args: %#v", test.args))
 		})
@@ -239,10 +232,7 @@ func TestFilesWithExcludedDirs(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			var opts = &models.Options{}
-			opts.Config.ExcludeDirs = test.config
-
-			got, _ := FilesOfArgs(test.args, opts)
+			got, _ := FilesOfArgs(test.args, Options{ExcludeDirs: test.config})
 
 			assert.Equal(t, test.expect, cleanupPaths(t, got), fmt.Sprintf("With args: %#v", test.args))
 		})
