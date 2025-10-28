@@ -193,8 +193,6 @@ func main() {
 	}).Run(ctx, os.Args); err != nil {
 		log.Fatalln(err)
 	}
-
-	// os.Exit(mainCmd(os.Args[1:]))
 }
 
 type options struct {
@@ -287,12 +285,12 @@ MUTATOR:
 			return fmt.Errorf("parse file: %w", err)
 		}
 
-		err = os.MkdirAll(tmpDir+"/"+filepath.Dir(file), 0755)
+		err = os.MkdirAll(filepath.Join(tmpDir, filepath.Dir(file)), 0755)
 		if err != nil {
 			panic(err)
 		}
 
-		tmpFile := tmpDir + "/" + file
+		tmpFile := filepath.Join(tmpDir, file)
 
 		originalFile := fmt.Sprintf("%s.original", tmpFile)
 		err = CopyFile(file, originalFile)
