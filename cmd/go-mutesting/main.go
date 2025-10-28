@@ -582,11 +582,11 @@ func mutateExec(
 
 	execCommand.Env = append(os.Environ(), []string{
 		"MUTATE_CHANGED=" + mutationFile,
-		// fmt.Sprintf("MUTATE_DEBUG=%t", opts.General.Debug),
+		fmt.Sprintf("MUTATE_DEBUG=%t", opts.debug),
 		"MUTATE_ORIGINAL=" + file,
 		"MUTATE_PACKAGE=" + pkg.Path(),
 		fmt.Sprintf("MUTATE_TIMEOUT=%d", opts.execTimeout),
-		// fmt.Sprintf("MUTATE_VERBOSE=%t", opts.General.Verbose),
+		fmt.Sprintf("MUTATE_VERBOSE=%t", opts.verbose),
 	}...)
 	if opts.testRecursive {
 		execCommand.Env = append(execCommand.Env, "TEST_RECURSIVE=true")
