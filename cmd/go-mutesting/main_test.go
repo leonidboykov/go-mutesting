@@ -8,17 +8,19 @@ import (
 	"os"
 	"testing"
 
-	"github.com/leonidboykov/go-mutesting/internal/models"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/leonidboykov/go-mutesting/internal/importing"
+	"github.com/leonidboykov/go-mutesting/internal/models"
 )
 
 func TestMainSimple(t *testing.T) {
 	testMain(
 		t,
 		"../../example",
-		[]string{"--debug", "--exec-timeout", "1"},
-		returnOk,
+		options{execTimeout: 1},
+		"",
 		"The mutation score is 0.564516 (35 passed, 27 failed, 8 duplicated, 0 skipped, total is 62)",
 	)
 }
@@ -27,8 +29,8 @@ func TestMainRecursive(t *testing.T) {
 	testMain(
 		t,
 		"../../example",
-		[]string{"--debug", "--exec-timeout", "1", "./..."},
-		returnOk,
+		options{args: []string{"./..."}, debug: true, execTimeout: 1},
+		"",
 		"The mutation score is 0.590909 (39 passed, 27 failed, 8 duplicated, 0 skipped, total is 66)",
 	)
 }
@@ -37,8 +39,8 @@ func TestMainFromOtherDirectory(t *testing.T) {
 	testMain(
 		t,
 		"../..",
-		[]string{"--debug", "--exec-timeout", "1", "github.com/leonidboykov/go-mutesting/example"},
-		returnOk,
+		options{args: []string{"github.com/leonidboykov/go-mutesting/example"}, debug: true, execTimeout: 1},
+		"",
 		"The mutation score is 0.564516 (35 passed, 27 failed, 8 duplicated, 0 skipped, total is 62)",
 	)
 }
@@ -47,8 +49,8 @@ func TestMainMatch(t *testing.T) {
 	testMain(
 		t,
 		"../../example",
-		[]string{"--debug", "--exec", "../scripts/exec/test-mutated-package.sh", "--exec-timeout", "1", "--match", "baz", "./..."},
-		returnOk,
+		options{args: []string{"./..."}, debug: true, execTimeout: 1, exec: "../scripts/exec/test-mutated-package.sh", match: "baz"},
+		"",
 		"The mutation score is 0.500000 (4 passed, 4 failed, 0 duplicated, 0 skipped, total is 8)",
 	)
 }
@@ -57,8 +59,11 @@ func TestMainSkipWithoutTest(t *testing.T) {
 	testMain(
 		t,
 		"../../example",
-		[]string{"--debug", "--exec-timeout", "1", "--config", "../testdata/configs/configSkipWithoutTest.yml.test"},
-		returnOk,
+		options{args: []string{}, debug: true, execTimeout: 1, importingOpts: importing.Options{
+			SkipFileWithoutTest:  true,
+			SkipFileWithBuildTag: true,
+		}},
+		"",
 		"The mutation score is 0.583333 (35 passed, 25 failed, 8 duplicated, 0 skipped, total is 60)",
 	)
 }
@@ -79,8 +84,11 @@ func TestMainJSONReport(t *testing.T) {
 	testMain(
 		t,
 		"../../example",
-		[]string{"--debug", "--exec-timeout", "1", "--config", "../testdata/configs/configForJson.yml.test"},
-		returnOk,
+		options{debug: true, execTimeout: 1, importingOpts: importing.Options{
+			SkipFileWithoutTest:  true,
+			SkipFileWithBuildTag: true,
+		}},
+		"",
 		"The mutation score is 0.583333 (35 passed, 25 failed, 8 duplicated, 0 skipped, total is 60)",
 	)
 
@@ -130,7 +138,7 @@ func TestMainJSONReport(t *testing.T) {
 	}
 }
 
-func testMain(t *testing.T, root string, exec []string, expectedExitCode int, contains string) {
+func testMain(t *testing.T, root string, opts options, expectedError string, contains string) {
 	saveStderr := os.Stderr
 	saveStdout := os.Stdout
 	saveCwd, err := os.Getwd()
@@ -154,7 +162,7 @@ func testMain(t *testing.T, root string, exec []string, expectedExitCode int, co
 		bufChannel <- buf.String()
 	}()
 
-	exitCode := mainCmd(exec)
+	exitErr := executeMutesting(t.Context(), opts)
 
 	assert.Nil(t, w.Close())
 
@@ -164,6 +172,10 @@ func testMain(t *testing.T, root string, exec []string, expectedExitCode int, co
 
 	out := <-bufChannel
 
-	assert.Equal(t, expectedExitCode, exitCode)
+	if expectedError == "" {
+		require.NoError(t, exitErr)
+	} else {
+		require.EqualError(t, exitErr, expectedError)
+	}
 	assert.Contains(t, out, contains)
 }

@@ -19,11 +19,15 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/packages"
-
-	"github.com/leonidboykov/go-mutesting/internal/models"
 )
 
-func FilesOfArgs(args []string, opts *models.Options) ([]string, error) {
+type Options struct {
+	SkipFileWithoutTest  bool
+	SkipFileWithBuildTag bool
+	ExcludeDirs          []string
+}
+
+func FilesOfArgs(args []string, opts Options) ([]string, error) {
 	if len(args) == 0 {
 		args = []string{"."}
 	}
@@ -38,11 +42,11 @@ func FilesOfArgs(args []string, opts *models.Options) ([]string, error) {
 	for _, p := range pkgs {
 		iter := skipExcludedDirs(
 			removeDuplicates(slices.Values(p.GoFiles)),
-			opts.Config.ExcludeDirs,
+			opts.ExcludeDirs,
 		)
-		if opts.Config.SkipFileWithoutTest || opts.Config.SkipFileWithBuildTag {
+		if opts.SkipFileWithoutTest || opts.SkipFileWithBuildTag {
 			iter = skipFilesWithoutTests(iter)
-			if opts.Config.SkipFileWithBuildTag {
+			if opts.SkipFileWithBuildTag {
 				iter = skipFilesWithBuildTag(iter)
 			}
 		}
