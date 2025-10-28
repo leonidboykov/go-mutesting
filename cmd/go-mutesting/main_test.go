@@ -8,11 +8,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/leonidboykov/go-mutesting/internal/importing"
-	"github.com/leonidboykov/go-mutesting/internal/models"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/leonidboykov/go-mutesting/internal/importing"
+	"github.com/leonidboykov/go-mutesting/internal/models"
 )
 
 func TestMainSimple(t *testing.T) {
