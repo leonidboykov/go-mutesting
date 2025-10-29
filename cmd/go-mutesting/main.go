@@ -60,12 +60,14 @@ func main() {
 	defer cancel()
 
 	logLevel := new(slog.LevelVar)
+	logLevel.Set(slog.LevelInfo)
 	slog.SetDefault(
 		slog.New(tint.NewHandler(os.Stderr, &tint.Options{
 			Level:      logLevel,
 			TimeFormat: time.DateTime,
 		})),
 	)
+	slog.SetLogLoggerLevel(slog.LevelError)
 
 	var configFile string
 	if err := (&cli.Command{
@@ -119,13 +121,6 @@ func main() {
 					yamlsrc.YAML("skip_with_build_tags", altsrc.NewStringPtrSourcer(&configFile)),
 				),
 			},
-			// &cli.BoolFlag{
-			// 	Name:  "json-output",
-			// 	Usage: "output logs in json format",
-			// 	Sources: cli.NewValueSourceChain(
-			// 		yamlsrc.YAML("json_output", altsrc.NewStringPtrSourcer(&configFile)),
-			// 	),
-			// },
 			&cli.StringFlag{
 				Name:  "exec",
 				Usage: "execute this command for every mutation (by default the built-in exec command is used)",
@@ -152,6 +147,10 @@ func main() {
 				Sources: cli.NewValueSourceChain(
 					yamlsrc.YAML("exclude_dirs", altsrc.NewStringPtrSourcer(&configFile)),
 				),
+			},
+			&cli.StringFlag{
+				Name:  "git-branch",
+				Usage: "check only files changed against specified git branch",
 			},
 		},
 		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
@@ -184,6 +183,7 @@ func main() {
 				importingOpts: importing.Options{
 					SkipFileWithoutTest:  c.Bool("skip-without-test"),
 					SkipFileWithBuildTag: c.Bool("skip-with-build-tags"),
+					GitMainBranch:        c.String("git-branch"),
 					ExcludeDirs:          c.StringArgs("exclude-dirs"),
 				},
 				debug:   c.Bool("debug"),
@@ -191,7 +191,7 @@ func main() {
 			})
 		},
 	}).Run(ctx, os.Args); err != nil {
-		log.Fatalln(err)
+		log.Println(err)
 	}
 }
 
@@ -463,8 +463,11 @@ func mutate(
 
 						mutant.ProcessOutput = out
 						stats.Stats.SkippedCount++
+					case -1: // Cancel
+						slog.Warn("cancel signal received, exiting now")
+						os.Exit(1)
 					default:
-						out := fmt.Sprintf("UNKOWN exit code for %s\n", msg)
+						out := fmt.Sprintf("UNKOWN exit code %d for %s\n", execExitCode, msg)
 						if !opts.silentMode {
 							fmt.Print(out)
 						}
