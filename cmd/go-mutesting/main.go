@@ -463,6 +463,9 @@ func mutate(
 
 						mutant.ProcessOutput = out
 						stats.Stats.SkippedCount++
+					case -1: // Cancel
+						slog.Warn("cancel signal received, exiting now")
+						os.Exit(1)
 					default:
 						out := fmt.Sprintf("UNKOWN exit code %d for %s\n", execExitCode, msg)
 						if !opts.silentMode {
