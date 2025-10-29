@@ -18,6 +18,7 @@ var listFilesCommand = &cli.Command{
 		files, err := importing.FilesOfArgs(c.Args().Slice(), importing.Options{
 			SkipFileWithoutTest:  c.Bool("skip-without-test"),
 			SkipFileWithBuildTag: c.Bool("skip-with-build-tags"),
+			GitMainBranch:        c.String("git-branch"),
 			ExcludeDirs:          c.StringArgs("exclude-dirs"),
 		})
 		if err != nil {
@@ -48,6 +49,7 @@ var printASTCommand = &cli.Command{
 		files, err := importing.FilesOfArgs(c.Args().Slice(), importing.Options{
 			SkipFileWithoutTest:  c.Bool("skip-without-test"),
 			SkipFileWithBuildTag: c.Bool("skip-with-build-tags"),
+			GitMainBranch:        c.String("git-branch"),
 			ExcludeDirs:          c.StringArgs("exclude-dirs"),
 		})
 		if err != nil {
