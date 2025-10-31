@@ -28,6 +28,7 @@ import (
 	altsrc "github.com/urfave/cli-altsrc/v3"
 	yamlsrc "github.com/urfave/cli-altsrc/v3/yaml"
 	"github.com/urfave/cli/v3"
+	"golang.org/x/tools/go/packages"
 
 	"github.com/leonidboykov/go-mutesting"
 	"github.com/leonidboykov/go-mutesting/astutil"
@@ -148,6 +149,13 @@ func main() {
 					yamlsrc.YAML("exclude_dirs", altsrc.NewStringPtrSourcer(&configFile)),
 				),
 			},
+			&cli.BoolFlag{
+				Name:  "json-output",
+				Usage: "output logs in json format",
+				Sources: cli.NewValueSourceChain(
+					yamlsrc.YAML("json_output", altsrc.NewStringPtrSourcer(&configFile)),
+				),
+			},
 			&cli.StringFlag{
 				Name:  "git-branch",
 				Usage: "check only files changed against specified git branch",
@@ -186,8 +194,9 @@ func main() {
 					GitMainBranch:        c.String("git-branch"),
 					ExcludeDirs:          c.StringArgs("exclude-dirs"),
 				},
-				debug:   c.Bool("debug"),
-				verbose: c.Bool("verbose"),
+				debug:      c.Bool("debug"),
+				verbose:    c.Bool("verbose"),
+				jsonOutput: c.Bool("json_output"),
 			})
 		},
 	}).Run(ctx, os.Args); err != nil {
@@ -207,6 +216,7 @@ type options struct {
 	exec                 string
 	noExec               bool
 	execTimeout          uint
+	jsonOutput           bool
 	debug                bool
 	verbose              bool
 }
@@ -280,7 +290,7 @@ MUTATOR:
 	for _, file := range files {
 		verbose("Mutate %q", file)
 
-		src, fset, pkg, info, err := mutesting.ParseAndTypeCheckFile(file)
+		src, pkg, err := mutesting.ParseAndTypeCheckFile(file)
 		if err != nil {
 			return fmt.Errorf("parse file: %w", err)
 		}
@@ -309,11 +319,11 @@ MUTATOR:
 
 			for _, f := range astutil.Functions(src) {
 				if m.MatchString(f.Name.Name) {
-					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, info, file, fset, src, f, tmpFile, execs, report)
+					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, f, tmpFile, execs, report)
 				}
 			}
 		} else {
-			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, info, file, fset, src, src, tmpFile, execs, report)
+			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, src, tmpFile, execs, report)
 		}
 	}
 
@@ -340,6 +350,11 @@ MUTATOR:
 		}
 	} else {
 		fmt.Println("Cannot do a mutation testing summary since no exec command was executed.")
+	}
+
+	if !opts.jsonOutput {
+		// Skip json output.
+		return nil
 	}
 
 	jsonContent, err := json.Marshal(report)
@@ -378,22 +393,20 @@ func mutate(
 	mutators []mutatorItem,
 	mutationBlackList map[string]struct{},
 	mutationID int,
-	pkg *types.Package,
-	info *types.Info,
+	pkg *packages.Package,
 	originalFile string,
-	fset *token.FileSet,
-	src ast.Node,
+	src *ast.File,
 	node ast.Node,
 	mutatedFile string,
 	execs []string,
 	stats *models.Report,
 ) int {
-	skippedLines := mutesting.Skips(fset, src.(*ast.File))
+	skippedLines := mutesting.Skips(pkg.Fset, src)
 
 	for _, m := range mutators {
 		debug("Mutator %s", m.Name)
 
-		changed := mutesting.MutateWalk(pkg, info, fset, node, m.Mutator, skippedLines)
+		changed := mutesting.MutateWalk(pkg, node, m.Mutator, skippedLines)
 
 		for {
 			_, ok := <-changed
@@ -413,7 +426,7 @@ func mutate(
 			mutant.Mutator.OriginalSourceCode = string(originalSourceCode)
 
 			mutationFile := fmt.Sprintf("%s.%d", mutatedFile, mutationID)
-			checksum, duplicate, err := saveAST(mutationBlackList, mutationFile, fset, src)
+			checksum, duplicate, err := saveAST(mutationBlackList, mutationFile, pkg.Fset, src)
 			if err != nil {
 				fmt.Printf("INTERNAL ERROR %s\n", err.Error())
 			} else if duplicate {
@@ -424,7 +437,7 @@ func mutate(
 				debug("Save mutation into %q with checksum %s", mutationFile, checksum)
 
 				if !opts.noExec {
-					execExitCode := mutateExec(ctx, opts, pkg, originalFile, src, mutationFile, execs, &mutant)
+					execExitCode := mutateExec(ctx, opts, pkg.Types, originalFile, mutationFile, execs, &mutant)
 
 					debug("Exited with %d", execExitCode)
 
@@ -497,7 +510,6 @@ func mutateExec(
 	opts options,
 	pkg *types.Package,
 	file string,
-	src ast.Node,
 	mutationFile string,
 	execs []string,
 	mutant *models.Mutant,

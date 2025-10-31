@@ -29,7 +29,7 @@ func MutatorElse(pkg *types.Package, info *types.Info, node ast.Node) []mutator.
 	return []mutator.Mutation{
 		{
 			Change: func() {
-				n.Else = astutil.CreateNoopOfStatement(pkg, info, old)
+				n.Else = astutil.CreateNoopOfStatements(pkg, info, old)
 			},
 			Reset: func() {
 				n.Else = old

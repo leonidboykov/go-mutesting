@@ -6,13 +6,8 @@ import (
 	"go/types"
 )
 
-// CreateNoopOfStatement creates a syntactically safe noop statement out of a given statement.
-func CreateNoopOfStatement(pkg *types.Package, info *types.Info, stmt ast.Stmt) ast.Stmt {
-	return CreateNoopOfStatements(pkg, info, []ast.Stmt{stmt})
-}
-
 // CreateNoopOfStatements creates a syntactically safe noop statement out of a given statement.
-func CreateNoopOfStatements(pkg *types.Package, info *types.Info, stmts []ast.Stmt) ast.Stmt {
+func CreateNoopOfStatements(pkg *types.Package, info *types.Info, stmts ...ast.Stmt) ast.Stmt {
 	var ids []ast.Expr
 	for _, stmt := range stmts {
 		ids = append(ids, IdentifiersInStatement(pkg, info, stmt)...)

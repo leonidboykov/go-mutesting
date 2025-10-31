@@ -25,7 +25,7 @@ func MutatorIf(pkg *types.Package, info *types.Info, node ast.Node) []mutator.Mu
 		{
 			Change: func() {
 				n.Body.List = []ast.Stmt{
-					astutil.CreateNoopOfStatement(pkg, info, n.Body),
+					astutil.CreateNoopOfStatements(pkg, info, n.Body),
 				}
 			},
 			Reset: func() {

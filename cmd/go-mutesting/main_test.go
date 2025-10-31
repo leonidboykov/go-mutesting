@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -73,7 +74,7 @@ func TestMainJSONReport(t *testing.T) {
 	assert.NoError(t, err)
 
 	reportFileName := "reportTestMainJSONReport.json"
-	jsonFile := tmpDir + "/" + reportFileName
+	jsonFile := filepath.Join(tmpDir, reportFileName)
 	if _, err := os.Stat(jsonFile); err == nil {
 		err = os.Remove(jsonFile)
 		assert.NoError(t, err)
@@ -84,7 +85,7 @@ func TestMainJSONReport(t *testing.T) {
 	testMain(
 		t,
 		"../../example",
-		options{debug: true, execTimeout: 1, importingOpts: importing.Options{
+		options{debug: true, execTimeout: 1, jsonOutput: true, importingOpts: importing.Options{
 			SkipFileWithoutTest:  true,
 			SkipFileWithBuildTag: true,
 		}},
@@ -96,12 +97,12 @@ func TestMainJSONReport(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, info)
 
-	defer func() {
+	t.Cleanup(func() {
 		err = os.Remove(jsonFile)
 		if err != nil {
 			fmt.Println("Error while deleting temp file")
 		}
-	}()
+	})
 
 	jsonData, err := os.ReadFile(jsonFile)
 	assert.NoError(t, err)
