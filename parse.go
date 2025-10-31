@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"path/filepath"
 	"strings"
 
@@ -13,8 +12,8 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// ParseFile parses the content of the given file and returns the corresponding [ast.File] node and its file set for positional information.
-// If a fatal error is encountered the error return argument is not nil.
+// ParseFile parses the content of the given file and returns the corresponding [ast.File] node and its file set for
+// positional information. If a fatal error is encountered the error return argument is not nil.
 func ParseFile(filename string) (*ast.File, *token.FileSet, error) {
 	pkg, src, err := parseFile(filename)
 	if err != nil {
@@ -23,18 +22,18 @@ func ParseFile(filename string) (*ast.File, *token.FileSet, error) {
 	return src, pkg.Fset, err
 }
 
-func ParseAndTypeCheckFile(filename string) (*ast.File, *token.FileSet, *types.Package, *types.Info, error) {
+func ParseAndTypeCheckFile(filename string) (*ast.File, *packages.Package, error) {
 	pkg, src, err := parseFile(filename)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("parse file: %w", err)
+		return nil, nil, fmt.Errorf("parse file: %w", err)
 	}
-	return src, pkg.Fset, pkg.Types, pkg.TypesInfo, nil
+	return src, pkg, nil
 }
 
 // Skips checks all comments and finds `//nomutesting` directives.
-func Skips(fset *token.FileSet, f *ast.File) map[int]struct{} {
+func Skips(fset *token.FileSet, src *ast.File) map[int]struct{} {
 	skippedLines := make(map[int]struct{})
-	for _, commentGroup := range f.Comments {
+	for _, commentGroup := range src.Comments {
 		for _, comment := range commentGroup.List {
 			text := strings.TrimLeft(comment.Text, "/ ")
 			if strings.HasPrefix(text, "nomutesting") {

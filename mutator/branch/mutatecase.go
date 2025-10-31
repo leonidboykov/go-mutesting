@@ -25,7 +25,7 @@ func MutatorCase(pkg *types.Package, info *types.Info, node ast.Node) []mutator.
 		{
 			Change: func() {
 				n.Body = []ast.Stmt{
-					astutil.CreateNoopOfStatements(pkg, info, n.Body),
+					astutil.CreateNoopOfStatements(pkg, info, n.Body...),
 				}
 			},
 			Reset: func() {

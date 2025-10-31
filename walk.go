@@ -3,9 +3,9 @@ package mutesting
 import (
 	"fmt"
 	"go/ast"
-	"go/token"
-	"go/types"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 
 	"github.com/leonidboykov/go-mutesting/mutator"
 )
@@ -13,13 +13,11 @@ import (
 // CountWalk returns the number of corresponding mutations for a given mutator. It traverses the AST of the given node
 // and calls the method Check of the given mutator for every node and sums up the returned counts. After completion of
 // the traversal the final counter is returned.
-func CountWalk(pkg *types.Package, info *types.Info, fset *token.FileSet, node ast.Node, m mutator.Mutator, skippedLines map[int]struct{}) int {
+func CountWalk(pkg *packages.Package, node ast.Node, m mutator.Mutator, skippedLines map[int]struct{}) int {
 	w := &countWalk{
 		count:   0,
 		mutator: m,
 		pkg:     pkg,
-		info:    info,
-		fset:    fset,
 		skipped: skippedLines,
 	}
 
@@ -31,9 +29,7 @@ func CountWalk(pkg *types.Package, info *types.Info, fset *token.FileSet, node a
 type countWalk struct {
 	count   int
 	mutator mutator.Mutator
-	pkg     *types.Package
-	info    *types.Info
-	fset    *token.FileSet
+	pkg     *packages.Package
 	skipped map[int]struct{}
 }
 
@@ -43,10 +39,10 @@ func (w *countWalk) Visit(node ast.Node) ast.Visitor {
 		return w
 	}
 
-	line := w.fset.Position(node.Pos()).Line
+	line := w.pkg.Fset.Position(node.Pos()).Line
 	_, ok := w.skipped[line]
 	if !ok {
-		w.count += len(w.mutator(w.pkg, w.info, node))
+		w.count += len(w.mutator(w.pkg.Types, w.pkg.TypesInfo, node))
 	}
 
 	return w
@@ -56,13 +52,11 @@ func (w *countWalk) Visit(node ast.Node) ast.Visitor {
 // traverses the AST of the given node and calls the method Check of the given mutator to verify that a node can be
 // mutated by the mutator. If a node can be mutated the method Mutate of the given mutator is executed with the node and
 // the control channel. After completion of the traversal the control channel is closed.
-func MutateWalk(pkg *types.Package, info *types.Info, fset *token.FileSet, node ast.Node, m mutator.Mutator, skippedLines map[int]struct{}) chan bool {
+func MutateWalk(pkg *packages.Package, node ast.Node, m mutator.Mutator, skippedLines map[int]struct{}) chan bool {
 	w := &mutateWalk{
 		changed: make(chan bool),
 		mutator: m,
 		pkg:     pkg,
-		info:    info,
-		fset:    fset,
 		skipped: skippedLines,
 	}
 
@@ -78,9 +72,7 @@ func MutateWalk(pkg *types.Package, info *types.Info, fset *token.FileSet, node 
 type mutateWalk struct {
 	changed chan bool
 	mutator mutator.Mutator
-	pkg     *types.Package
-	info    *types.Info
-	fset    *token.FileSet
+	pkg     *packages.Package
 	skipped map[int]struct{}
 }
 
@@ -90,13 +82,13 @@ func (w *mutateWalk) Visit(node ast.Node) ast.Visitor {
 		return w
 	}
 
-	line := w.fset.Position(node.Pos()).Line
+	line := w.pkg.Fset.Position(node.Pos()).Line
 	_, ok := w.skipped[line]
 	if ok {
 		return w
 	}
 
-	for _, m := range w.mutator(w.pkg, w.info, node) {
+	for _, m := range w.mutator(w.pkg.Types, w.pkg.TypesInfo, node) {
 		m.Change()
 		w.changed <- true
 		<-w.changed

@@ -15,7 +15,8 @@ import (
 )
 
 // Mutator tests a mutator.
-// It mutates the given original file with the given mutator. Every mutation is then validated with the given changed file. The mutation overall count is validated with the given count.
+// It mutates the given original file with the given mutator. Every mutation is then validated with the given changed
+// file. The mutation overall count is validated with the given count.
 func Mutator(t *testing.T, m mutator.Mutator, testFile string, count int) {
 	// Test if mutator is not nil
 	assert.NotNil(t, m)
@@ -25,26 +26,26 @@ func Mutator(t *testing.T, m mutator.Mutator, testFile string, count int) {
 	assert.Nil(t, err)
 
 	// Parse and type-check the original source code
-	src, fset, pkg, info, err := mutesting.ParseAndTypeCheckFile(testFile)
+	src, pkg, err := mutesting.ParseAndTypeCheckFile(testFile)
 	assert.Nil(t, err)
 
-	skippedLines := mutesting.Skips(fset, src)
+	skippedLines := mutesting.Skips(pkg.Fset, src)
 
 	// Mutate a non relevant node
-	assert.Nil(t, m(pkg, info, src))
+	assert.Nil(t, m(pkg.Types, pkg.TypesInfo, src))
 
 	// Count the actual mutations
-	n := mutesting.CountWalk(pkg, info, fset, src, m, skippedLines)
+	n := mutesting.CountWalk(pkg, src, m, skippedLines)
 	assert.Equal(t, count, n)
 
 	// Mutate all relevant nodes -> test whole mutation process
-	changed := mutesting.MutateWalk(pkg, info, fset, src, m, skippedLines)
+	changed := mutesting.MutateWalk(pkg, src, m, skippedLines)
 
 	for i := range count {
 		assert.True(t, <-changed)
 
 		buf := new(bytes.Buffer)
-		err = printer.Fprint(buf, fset, src)
+		err = printer.Fprint(buf, pkg.Fset, src)
 		assert.Nil(t, err)
 
 		dir := filepath.Dir(testFile)
@@ -63,7 +64,7 @@ func Mutator(t *testing.T, m mutator.Mutator, testFile string, count int) {
 		assert.True(t, <-changed)
 
 		buf = new(bytes.Buffer)
-		err = printer.Fprint(buf, fset, src)
+		err = printer.Fprint(buf, pkg.Fset, src)
 		assert.Nil(t, err)
 
 		assert.Equal(t, string(data), buf.String())
