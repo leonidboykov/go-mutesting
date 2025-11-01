@@ -1,14 +1,5 @@
 package importing
 
-/*
-
-This file holds lots of code of the golint project https://github.com/golang/lint and some code of a pull request of mine https://github.com/golang/lint/pull/76
-This is just temporary until I have time to clean up this code and make a more general solution for go-commands as I stated here https://github.com/kisielk/errcheck/issues/45#issuecomment-57732642
-
-so TODO and FIXME. Heck I also give you a WORKAROUND.
-
-*/
-
 import (
 	"fmt"
 	"iter"
@@ -211,7 +202,7 @@ func getChangedFilesFromGit(mainBranch string) ([]string, error) {
 		return nil, fmt.Errorf("get main tree: %w", err)
 	}
 
-	changes, err := object.DiffTree(currTree, mainTree)
+	changes, err := object.DiffTree(mainTree, currTree)
 	if err != nil {
 		return nil, fmt.Errorf("get changes: %w", err)
 	}

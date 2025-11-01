@@ -518,10 +518,11 @@ func mutateExec(
 		debug("Execute built-in exec command for mutation")
 
 		diff, err := exec.Command("diff", "--label=Original", "--label=New", "-u", file, mutationFile).CombinedOutput()
+		var exitError *exec.ExitError
 		if err == nil {
 			execExitCode = 0
-		} else if e, ok := err.(*exec.ExitError); ok {
-			execExitCode = e.Sys().(syscall.WaitStatus).ExitStatus()
+		} else if errors.As(err, &exitError) {
+			execExitCode = exitError.ExitCode()
 		} else {
 			panic(err)
 		}
@@ -588,6 +589,12 @@ func mutateExec(
 		return execExitCode
 	}
 
+	var cancel context.CancelFunc
+	if opts.execTimeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(opts.execTimeout)*time.Second)
+	}
+	defer cancel()
+
 	debug("Execute %q for mutation", opts.exec)
 
 	execCommand := exec.CommandContext(ctx, execs[0], execs[1:]...)
@@ -612,14 +619,13 @@ func mutateExec(
 		panic(err)
 	}
 
-	// TODO timeout here
-
 	err = execCommand.Wait()
 
+	var exitError *exec.ExitError
 	if err == nil {
 		execExitCode = 0
-	} else if e, ok := err.(*exec.ExitError); ok {
-		execExitCode = e.Sys().(syscall.WaitStatus).ExitStatus()
+	} else if errors.As(err, &exitError) {
+		execExitCode = exitError.ExitCode()
 	} else {
 		panic(err)
 	}
