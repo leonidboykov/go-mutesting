@@ -21,9 +21,14 @@ var assignInvertMutations = map[token.Token]token.Token{
 }
 
 // MutatorArithmeticAssignInvert implements a mutator to invert change assign statements.
-func MutatorArithmeticAssignInvert(_ *types.Package, _ *types.Info, node ast.Node) []mutator.Mutation {
+func MutatorArithmeticAssignInvert(_ *types.Package, info *types.Info, node ast.Node) []mutator.Mutation {
 	n, ok := node.(*ast.AssignStmt)
 	if !ok {
+		return nil
+	}
+
+	// Skip concatenation case.
+	if len(n.Lhs) > 0 && isConcatenationCase(info, n.Lhs[0]) {
 		return nil
 	}
 

@@ -21,9 +21,14 @@ var arithmeticMutations = map[token.Token]token.Token{
 }
 
 // MutatorArithmeticBase implements a mutator to change base arithmetic.
-func MutatorArithmeticBase(_ *types.Package, _ *types.Info, node ast.Node) []mutator.Mutation {
+func MutatorArithmeticBase(_ *types.Package, info *types.Info, node ast.Node) []mutator.Mutation {
 	n, ok := node.(*ast.BinaryExpr)
 	if !ok {
+		return nil
+	}
+
+	// Skip concatenation case.
+	if isConcatenationCase(info, n) {
 		return nil
 	}
 
@@ -43,4 +48,14 @@ func MutatorArithmeticBase(_ *types.Package, _ *types.Info, node ast.Node) []mut
 			},
 		},
 	}
+}
+
+// isConcatenationCase checks if operation is a concatenation case. Mutation leads syntax error.
+func isConcatenationCase(info *types.Info, expr ast.Expr) bool {
+	if x, ok := info.Types[expr]; ok {
+		if t, ok := x.Type.Underlying().(*types.Basic); ok {
+			return t.Kind() == types.String || t.Kind() == types.UntypedString
+		}
+	}
+	return false
 }
