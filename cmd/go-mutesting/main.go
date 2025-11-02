@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,12 +17,10 @@ import (
 	"log"
 	"log/slog"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/lmittmann/tint"
@@ -32,6 +31,8 @@ import (
 
 	"github.com/leonidboykov/go-mutesting"
 	"github.com/leonidboykov/go-mutesting/astutil"
+	"github.com/leonidboykov/go-mutesting/internal/diff"
+	"github.com/leonidboykov/go-mutesting/internal/execution"
 	"github.com/leonidboykov/go-mutesting/internal/importing"
 	"github.com/leonidboykov/go-mutesting/internal/models"
 	"github.com/leonidboykov/go-mutesting/mutator"
@@ -437,9 +438,11 @@ func mutate(
 				debug("Save mutation into %q with checksum %s", mutationFile, checksum)
 
 				if !opts.noExec {
-					execExitCode := mutateExec(ctx, opts, pkg.Types, originalFile, mutationFile, execs, &mutant)
+					mutationError := mutateExec(ctx, opts, pkg.Types, originalFile, mutationFile, execs, &mutant)
 
-					debug("Exited with %d", execExitCode)
+					if mutationError != nil {
+						slog.Info("exec mutation", slog.Any("error", mutationError))
+					}
 
 					mutatedSourceCode, err := os.ReadFile(mutationFile)
 					if err != nil {
@@ -449,8 +452,8 @@ func mutate(
 
 					msg := fmt.Sprintf("%q with checksum %s", mutationFile, checksum)
 
-					switch execExitCode {
-					case 0: // Tests failed - all ok
+					switch {
+					case mutationError == nil: // Tests failed - all ok
 						out := fmt.Sprintf("PASS %s\n", msg)
 						if !opts.silentMode {
 							fmt.Print(out)
@@ -459,7 +462,7 @@ func mutate(
 						mutant.ProcessOutput = out
 						stats.Killed = append(stats.Killed, mutant)
 						stats.Stats.KilledCount++
-					case 1: // Tests passed
+					case errors.Is(mutationError, execution.ErrMutationSurvived): // Tests passed
 						out := fmt.Sprintf("FAIL %s\n", msg)
 						if !opts.silentMode {
 							fmt.Print(out)
@@ -468,7 +471,8 @@ func mutate(
 						mutant.ProcessOutput = out
 						stats.Escaped = append(stats.Escaped, mutant)
 						stats.Stats.EscapedCount++
-					case 2: // Did not compile
+					case errors.Is(mutationError, execution.ErrCompilationError),
+						errors.Is(mutationError, context.DeadlineExceeded): // Did not compile
 						out := fmt.Sprintf("SKIP %s\n", msg)
 						if !opts.silentMode {
 							fmt.Print(out)
@@ -476,11 +480,11 @@ func mutate(
 
 						mutant.ProcessOutput = out
 						stats.Stats.SkippedCount++
-					case -1: // Cancel
+					case errors.Is(mutationError, context.Canceled): // Cancel
 						slog.Warn("cancel signal received, exiting now")
 						os.Exit(1)
 					default:
-						out := fmt.Sprintf("UNKOWN exit code %d for %s\n", execExitCode, msg)
+						out := fmt.Sprintf("UNKOWN exit code %s for %s: %s\n", mutationError, msg, mutationError)
 						if !opts.silentMode {
 							fmt.Print(out)
 						}
@@ -513,23 +517,16 @@ func mutateExec(
 	mutationFile string,
 	execs []string,
 	mutant *models.Mutant,
-) (execExitCode int) {
+) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(opts.execTimeout)*time.Second)
+	defer cancel()
+
 	if len(execs) == 0 {
 		debug("Execute built-in exec command for mutation")
 
-		diff, err := exec.Command("diff", "--label=Original", "--label=New", "-u", file, mutationFile).CombinedOutput()
-		var exitError *exec.ExitError
-		if err == nil {
-			execExitCode = 0
-		} else if errors.As(err, &exitError) {
-			execExitCode = exitError.ExitCode()
-		} else {
-			panic(err)
-		}
-		if execExitCode != 0 && execExitCode != 1 {
-			fmt.Printf("%s\n", diff)
-
-			panic("Could not execute diff on mutation file")
+		diffStr, err := diff.CompareFiles(file, mutationFile, mutant.Mutator.MutatorName)
+		if err != nil {
+			panic(err) // TODO: Do not panic on every error.
 		}
 
 		defer func() {
@@ -545,92 +542,49 @@ func mutateExec(
 			panic(err)
 		}
 
-		pkgName := pkg.Path()
-		if opts.testRecursive {
-			pkgName += "/..."
-		}
+		err = execution.GoTest(ctx, pkg.Path(), opts.testRecursive)
 
-		goTestCmd := exec.Command("go", "test", "-timeout", fmt.Sprintf("%ds", opts.execTimeout), pkgName)
-		goTestCmd.Env = os.Environ()
+		mutant.Diff = string(diffStr)
 
-		test, err := goTestCmd.CombinedOutput()
-		if err == nil {
-			execExitCode = 0
-		} else if e, ok := err.(*exec.ExitError); ok {
-			execExitCode = e.Sys().(syscall.WaitStatus).ExitStatus()
-		} else {
-			panic(err)
-		}
-
-		slog.Debug(string(test))
-
-		mutant.Diff = string(diff)
-
-		switch execExitCode {
-		case 0: // Tests passed -> FAIL
+		switch err {
+		case execution.ErrMutationSurvived: // Tests passed -> FAIL
 			if !opts.silentMode {
-				fmt.Printf("%s\n", diff)
+				fmt.Println(diffStr)
+			}
+		case nil: // Tests failed -> PASS
+			if opts.debug {
+				fmt.Println(diffStr)
+			}
+		case execution.ErrCompilationError: // Did not compile -> SKIP
+			slog.Info("Mutation did not compile")
+			if opts.debug {
+				fmt.Println(diffStr)
 			}
 
-			execExitCode = 1
-		case 1: // Tests failed -> PASS
-			slog.Debug(string(diff))
-			execExitCode = 0
-		case 2: // Did not compile -> SKIP
-			slog.Info("Mutation did not compile")
-			slog.Debug(string(diff))
 		default: // Unknown exit code -> SKIP
 			if !opts.silentMode {
-				fmt.Println("Unknown exit code")
-				fmt.Printf("%s\n", diff)
+				fmt.Println(diffStr)
 			}
 		}
 
-		return execExitCode
+		return err
 	}
-
-	var cancel context.CancelFunc
-	if opts.execTimeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(opts.execTimeout)*time.Second)
-	}
-	defer cancel()
 
 	debug("Execute %q for mutation", opts.exec)
 
-	execCommand := exec.CommandContext(ctx, execs[0], execs[1:]...)
-
-	execCommand.Stderr = os.Stderr
-	execCommand.Stdout = os.Stdout
-
-	execCommand.Env = append(os.Environ(), []string{
-		"MUTATE_CHANGED=" + mutationFile,
-		fmt.Sprintf("MUTATE_DEBUG=%t", opts.debug),
-		"MUTATE_ORIGINAL=" + file,
-		"MUTATE_PACKAGE=" + pkg.Path(),
-		fmt.Sprintf("MUTATE_TIMEOUT=%d", opts.execTimeout),
-		fmt.Sprintf("MUTATE_VERBOSE=%t", opts.verbose),
-	}...)
-	if opts.testRecursive {
-		execCommand.Env = append(execCommand.Env, "TEST_RECURSIVE=true")
+	if err := execution.Custom(ctx, execs, execution.CustomMutationOptions{
+		Changed:       mutationFile,
+		Debug:         opts.debug,
+		Original:      file,
+		Package:       pkg.Path(),
+		Timeout:       opts.execTimeout,
+		Verbose:       opts.verbose,
+		TestRecursive: opts.testRecursive,
+	}); err != nil {
+		return fmt.Errorf("execute custom command %q: %w", execs[0], err)
 	}
 
-	err := execCommand.Start()
-	if err != nil {
-		panic(err)
-	}
-
-	err = execCommand.Wait()
-
-	var exitError *exec.ExitError
-	if err == nil {
-		execExitCode = 0
-	} else if errors.As(err, &exitError) {
-		execExitCode = exitError.ExitCode()
-	} else {
-		panic(err)
-	}
-
-	return execExitCode
+	return nil
 }
 
 func saveAST(mutationBlackList map[string]struct{}, file string, fset *token.FileSet, node ast.Node) (string, bool, error) {
@@ -643,7 +597,7 @@ func saveAST(mutationBlackList map[string]struct{}, file string, fset *token.Fil
 		return "", false, err
 	}
 
-	checksum := fmt.Sprintf("%x", h.Sum(nil))
+	checksum := hex.EncodeToString(h.Sum(nil))
 
 	if _, ok := mutationBlackList[checksum]; ok {
 		return checksum, true, nil

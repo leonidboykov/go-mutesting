@@ -28,7 +28,7 @@ func MutatorArithmeticBase(_ *types.Package, info *types.Info, node ast.Node) []
 	}
 
 	// Skip concatenation case.
-	if isConcatenationCase(info, n) {
+	if isConcatenationCase(info, n.X) {
 		return nil
 	}
 
