@@ -1,4 +1,4 @@
-package mutesting
+package importing
 
 import (
 	"errors"
@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	//nolint:staticcheck
 	"golang.org/x/tools/go/packages"
 )
 

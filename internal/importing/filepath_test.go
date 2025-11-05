@@ -20,6 +20,7 @@ func TestFilesOfArgs(t *testing.T) {
 			args: []string{},
 			expect: []string{
 				"go-mutesting/internal/importing/filepath.go",
+				"go-mutesting/internal/importing/parse.go",
 			},
 		},
 		{

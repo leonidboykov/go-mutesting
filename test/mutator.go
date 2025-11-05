@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/leonidboykov/go-mutesting"
+	"github.com/leonidboykov/go-mutesting/internal/importing"
 	"github.com/leonidboykov/go-mutesting/mutator"
 )
 
@@ -26,10 +27,10 @@ func Mutator(t *testing.T, m mutator.Mutator, testFile string, count int) {
 	assert.Nil(t, err)
 
 	// Parse and type-check the original source code
-	src, pkg, err := mutesting.ParseAndTypeCheckFile(testFile)
+	src, pkg, err := importing.ParseAndTypeCheckFile(testFile)
 	assert.Nil(t, err)
 
-	skippedLines := mutesting.Skips(pkg.Fset, src)
+	skippedLines := importing.Skips(pkg.Fset, src)
 
 	// Mutate a non relevant node
 	assert.Nil(t, m(pkg.Types, pkg.TypesInfo, src))

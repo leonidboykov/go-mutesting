@@ -5,25 +5,12 @@ import (
 	"go/token"
 	"go/types"
 
-	"github.com/leonidboykov/go-mutesting/astutil"
+	"github.com/leonidboykov/go-mutesting/internal/astutil"
 	"github.com/leonidboykov/go-mutesting/mutator"
 )
 
 func init() {
 	mutator.Register("statement/remove", MutatorRemoveStatement)
-}
-
-func checkRemoveStatement(node ast.Stmt) bool {
-	switch n := node.(type) {
-	case *ast.AssignStmt:
-		if n.Tok != token.DEFINE {
-			return true
-		}
-	case *ast.ExprStmt, *ast.IncDecStmt:
-		return true
-	}
-
-	return false
 }
 
 // MutatorRemoveStatement implements a mutator to remove statements.
@@ -56,4 +43,29 @@ func MutatorRemoveStatement(pkg *types.Package, info *types.Info, node ast.Node)
 	}
 
 	return mutations
+}
+
+func checkRemoveStatement(node ast.Stmt) bool {
+	switch n := node.(type) {
+	case *ast.AssignStmt:
+		if n.Tok != token.DEFINE && !lhsIsBlank(n.Lhs) {
+			return true
+		}
+	case *ast.ExprStmt, *ast.IncDecStmt:
+		return true
+	}
+
+	return false
+}
+
+// lhsIsBlank checks if all expressions are blank. This allows to skip cases like in example:
+//
+//	_, _, _ = a, b, http.Header{}
+func lhsIsBlank(lhs []ast.Expr) bool {
+	for i := range lhs {
+		if l, ok := lhs[i].(*ast.Ident); !ok || l.Name != "_" {
+			return false
+		}
+	}
+	return true
 }

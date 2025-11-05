@@ -1,4 +1,4 @@
-package mutesting
+package importing
 
 import (
 	"testing"
@@ -7,6 +7,6 @@ import (
 )
 
 func TestParseAndTypeCheckFileTypeCheckWholePackage(t *testing.T) {
-	_, _, err := ParseAndTypeCheckFile("astutil/create.go")
+	_, _, err := ParseAndTypeCheckFile("../astutil/create.go")
 	assert.Nil(t, err)
 }
