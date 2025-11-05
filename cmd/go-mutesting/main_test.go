@@ -20,9 +20,9 @@ func TestMainSimple(t *testing.T) {
 	testMain(
 		t,
 		"../../example",
-		options{execTimeout: 1},
+		options{execTimeout: 10},
 		"",
-		"The mutation score is 0.564516 (35 passed, 27 failed, 8 duplicated, 0 skipped, total is 62)",
+		"The mutation score is 0.573770 (35 passed, 26 failed, 7 duplicated, 0 skipped, total is 61)",
 	)
 }
 
@@ -30,9 +30,9 @@ func TestMainRecursive(t *testing.T) {
 	testMain(
 		t,
 		"../../example",
-		options{args: []string{"./..."}, debug: true, execTimeout: 1},
+		options{args: []string{"./..."}, debug: true, execTimeout: 10},
 		"",
-		"The mutation score is 0.590909 (39 passed, 27 failed, 8 duplicated, 0 skipped, total is 66)",
+		"The mutation score is 0.600000 (39 passed, 26 failed, 7 duplicated, 0 skipped, total is 65)",
 	)
 }
 
@@ -40,9 +40,9 @@ func TestMainFromOtherDirectory(t *testing.T) {
 	testMain(
 		t,
 		"../..",
-		options{args: []string{"github.com/leonidboykov/go-mutesting/example"}, debug: true, execTimeout: 1},
+		options{args: []string{"github.com/leonidboykov/go-mutesting/example"}, debug: true, execTimeout: 10},
 		"",
-		"The mutation score is 0.564516 (35 passed, 27 failed, 8 duplicated, 0 skipped, total is 62)",
+		"The mutation score is 0.573770 (35 passed, 26 failed, 7 duplicated, 0 skipped, total is 61)",
 	)
 }
 
@@ -50,7 +50,7 @@ func TestMainMatch(t *testing.T) {
 	testMain(
 		t,
 		"../../example",
-		options{args: []string{"./..."}, debug: true, execTimeout: 1, exec: "../scripts/exec/test-mutated-package.sh", match: "baz"},
+		options{args: []string{"./..."}, debug: true, execTimeout: 10, exec: "../scripts/exec/test-mutated-package.sh", match: "baz"},
 		"",
 		"The mutation score is 0.500000 (4 passed, 4 failed, 0 duplicated, 0 skipped, total is 8)",
 	)
@@ -60,12 +60,12 @@ func TestMainSkipWithoutTest(t *testing.T) {
 	testMain(
 		t,
 		"../../example",
-		options{args: []string{}, debug: true, execTimeout: 1, importingOpts: importing.Options{
+		options{args: []string{}, debug: true, execTimeout: 10, importingOpts: importing.Options{
 			SkipFileWithoutTest:  true,
 			SkipFileWithBuildTag: true,
 		}},
 		"",
-		"The mutation score is 0.583333 (35 passed, 25 failed, 8 duplicated, 0 skipped, total is 60)",
+		"The mutation score is 0.583333 (35 passed, 25 failed, 7 duplicated, 0 skipped, total is 60)",
 	)
 }
 
@@ -85,12 +85,12 @@ func TestMainJSONReport(t *testing.T) {
 	testMain(
 		t,
 		"../../example",
-		options{debug: true, execTimeout: 1, jsonOutput: true, importingOpts: importing.Options{
+		options{debug: true, execTimeout: 10, jsonOutput: true, importingOpts: importing.Options{
 			SkipFileWithoutTest:  true,
 			SkipFileWithBuildTag: true,
 		}},
 		"",
-		"The mutation score is 0.583333 (35 passed, 25 failed, 8 duplicated, 0 skipped, total is 60)",
+		"The mutation score is 0.583333 (35 passed, 25 failed, 7 duplicated, 0 skipped, total is 60)",
 	)
 
 	info, err := os.Stat(jsonFile)

@@ -1,4 +1,4 @@
-package execution
+package execute
 
 import (
 	"context"
@@ -47,7 +47,7 @@ func Custom(ctx context.Context, execArgs []string, opts CustomMutationOptions) 
 	}
 
 	// Checking error from context is easier that deal with exotic exit codes.
-	if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 

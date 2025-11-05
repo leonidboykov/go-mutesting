@@ -30,9 +30,9 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/leonidboykov/go-mutesting"
-	"github.com/leonidboykov/go-mutesting/astutil"
+	"github.com/leonidboykov/go-mutesting/internal/astutil"
 	"github.com/leonidboykov/go-mutesting/internal/diff"
-	"github.com/leonidboykov/go-mutesting/internal/execution"
+	"github.com/leonidboykov/go-mutesting/internal/execute"
 	"github.com/leonidboykov/go-mutesting/internal/importing"
 	"github.com/leonidboykov/go-mutesting/internal/models"
 	"github.com/leonidboykov/go-mutesting/mutator"
@@ -63,12 +63,10 @@ func main() {
 
 	logLevel := new(slog.LevelVar)
 	logLevel.Set(slog.LevelInfo)
-	slog.SetDefault(
-		slog.New(tint.NewHandler(os.Stderr, &tint.Options{
-			Level:      logLevel,
-			TimeFormat: time.DateTime,
-		})),
-	)
+	slog.SetDefault(slog.New(tint.NewHandler(os.Stderr, &tint.Options{
+		Level:      logLevel,
+		TimeFormat: time.DateTime,
+	})))
 	slog.SetLogLoggerLevel(slog.LevelError)
 
 	var configFile string
@@ -291,7 +289,7 @@ MUTATOR:
 	for _, file := range files {
 		verbose("Mutate %q", file)
 
-		src, pkg, err := mutesting.ParseAndTypeCheckFile(file)
+		src, pkg, err := importing.ParseAndTypeCheckFile(file)
 		if err != nil {
 			return fmt.Errorf("parse file: %w", err)
 		}
@@ -402,7 +400,7 @@ func mutate(
 	execs []string,
 	stats *models.Report,
 ) int {
-	skippedLines := mutesting.Skips(pkg.Fset, src)
+	skippedLines := importing.Skips(pkg.Fset, src)
 
 	for _, m := range mutators {
 		debug("Mutator %s", m.Name)
@@ -462,7 +460,7 @@ func mutate(
 						mutant.ProcessOutput = out
 						stats.Killed = append(stats.Killed, mutant)
 						stats.Stats.KilledCount++
-					case errors.Is(mutationError, execution.ErrMutationSurvived): // Tests passed
+					case errors.Is(mutationError, execute.ErrMutationSurvived): // Tests passed
 						out := fmt.Sprintf("FAIL %s\n", msg)
 						if !opts.silentMode {
 							fmt.Print(out)
@@ -471,7 +469,7 @@ func mutate(
 						mutant.ProcessOutput = out
 						stats.Escaped = append(stats.Escaped, mutant)
 						stats.Stats.EscapedCount++
-					case errors.Is(mutationError, execution.ErrCompilationError),
+					case errors.Is(mutationError, execute.ErrCompilationError),
 						errors.Is(mutationError, context.DeadlineExceeded): // Did not compile
 						out := fmt.Sprintf("SKIP %s\n", msg)
 						if !opts.silentMode {
@@ -484,7 +482,7 @@ func mutate(
 						slog.Warn("cancel signal received, exiting now")
 						os.Exit(1)
 					default:
-						out := fmt.Sprintf("UNKOWN exit code %s for %s: %s\n", mutationError, msg, mutationError)
+						out := fmt.Sprintf("UNKOWN exit code for %s: %s\n", msg, mutationError)
 						if !opts.silentMode {
 							fmt.Print(out)
 						}
@@ -542,12 +540,12 @@ func mutateExec(
 			panic(err)
 		}
 
-		err = execution.GoTest(ctx, pkg.Path(), opts.testRecursive)
+		err = execute.GoTest(ctx, pkg.Path(), opts.testRecursive)
 
 		mutant.Diff = string(diffStr)
 
 		switch err {
-		case execution.ErrMutationSurvived: // Tests passed -> FAIL
+		case execute.ErrMutationSurvived: // Tests passed -> FAIL
 			if !opts.silentMode {
 				fmt.Println(diffStr)
 			}
@@ -555,7 +553,7 @@ func mutateExec(
 			if opts.debug {
 				fmt.Println(diffStr)
 			}
-		case execution.ErrCompilationError: // Did not compile -> SKIP
+		case execute.ErrCompilationError: // Did not compile -> SKIP
 			slog.Info("Mutation did not compile")
 			if opts.debug {
 				fmt.Println(diffStr)
@@ -572,7 +570,7 @@ func mutateExec(
 
 	debug("Execute %q for mutation", opts.exec)
 
-	if err := execution.Custom(ctx, execs, execution.CustomMutationOptions{
+	if err := execute.Custom(ctx, execs, execute.CustomMutationOptions{
 		Changed:       mutationFile,
 		Debug:         opts.debug,
 		Original:      file,

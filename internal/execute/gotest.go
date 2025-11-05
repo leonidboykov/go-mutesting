@@ -1,4 +1,4 @@
-package execution
+package execute
 
 import (
 	"context"
@@ -21,7 +21,9 @@ func GoTest(ctx context.Context, pkgName string, recursive bool) error {
 	if recursive {
 		pkgName += "/..."
 	}
-	cmd := exec.CommandContext(ctx, "go", "test", pkgName)
+
+	// The use of flag `-count=1` prevents from using testcache.
+	cmd := exec.CommandContext(ctx, "go", "test", "-count", "1", pkgName)
 	cmd.Env = os.Environ() // Is is necessary?
 
 	output, err := cmd.CombinedOutput()
@@ -34,7 +36,7 @@ func GoTest(ctx context.Context, pkgName string, recursive bool) error {
 	}
 
 	// Checking error from context is easier that deal with exotic exit codes.
-	if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 

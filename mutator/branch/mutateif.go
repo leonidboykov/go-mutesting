@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"go/types"
 
-	"github.com/leonidboykov/go-mutesting/astutil"
+	"github.com/leonidboykov/go-mutesting/internal/astutil"
 	"github.com/leonidboykov/go-mutesting/mutator"
 )
 
