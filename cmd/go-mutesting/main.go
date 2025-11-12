@@ -161,11 +161,6 @@ func main() {
 				Name:  "git-branch",
 				Usage: "check only files changed against specified git branch",
 			},
-			&cli.StringFlag{
-				Name:  "git-remote",
-				Value: "origin",
-				Usage: "allows to override origin remote name",
-			},
 		},
 		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
 			switch {
@@ -198,7 +193,6 @@ func main() {
 					SkipFileWithoutTest:  c.Bool("skip-without-test"),
 					SkipFileWithBuildTag: c.Bool("skip-with-build-tags"),
 					GitMainBranch:        c.String("git-branch"),
-					GitRemote:            c.String("git-remote"),
 					ExcludeDirs:          c.StringArgs("exclude-dirs"),
 				},
 				debug:      c.Bool("debug"),

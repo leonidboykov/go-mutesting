@@ -21,7 +21,6 @@ type Options struct {
 	SkipFileWithoutTest  bool
 	SkipFileWithBuildTag bool
 	GitMainBranch        string
-	GitRemote            string
 	ExcludeDirs          []string
 }
 
@@ -231,7 +230,12 @@ func getMainBranchRef(repo *git.Repository, mainBranch string) (*plumbing.Refere
 		return nil, fmt.Errorf("local ref: %w", err)
 	}
 
-	mainRef, err = repo.Reference(plumbing.NewRemoteReferenceName("origin", mainBranch), false)
+	parts := strings.SplitN(mainBranch, "/", 2)
+	if len(parts) != 2 {
+		return nil, errors.New("remote branch is expected in for <remote>/<branch>")
+	}
+
+	mainRef, err = repo.Reference(plumbing.NewRemoteReferenceName(parts[0], parts[1]), false)
 	if err != nil {
 		return nil, fmt.Errorf("remote ref: %w", err)
 	}
