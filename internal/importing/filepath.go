@@ -1,6 +1,7 @@
 package importing
 
 import (
+	"errors"
 	"fmt"
 	"iter"
 	"log"
@@ -189,7 +190,7 @@ func getChangedFilesFromGit(mainBranch string) ([]string, error) {
 		return nil, fmt.Errorf("get current tree: %w", err)
 	}
 
-	mainRef, err := repo.Reference(plumbing.NewBranchReferenceName(mainBranch), false)
+	mainRef, err := getMainBranchRef(repo, mainBranch)
 	if err != nil {
 		return nil, fmt.Errorf("get main ref: %w", err)
 	}
@@ -215,4 +216,29 @@ func getChangedFilesFromGit(mainBranch string) ([]string, error) {
 	}
 
 	return changedFiles, nil
+}
+
+// getMainBranchRef tries to locate a reference to a main (aka master) branch.
+//
+// FIXME: Not the best solution, this logic is not obvious to a user.
+func getMainBranchRef(repo *git.Repository, mainBranch string) (*plumbing.Reference, error) {
+	mainRef, err := repo.Reference(plumbing.NewBranchReferenceName(mainBranch), false)
+	if err == nil {
+		return mainRef, nil
+	}
+	if !errors.Is(err, plumbing.ErrReferenceNotFound) {
+		return nil, fmt.Errorf("local ref: %w", err)
+	}
+
+	parts := strings.SplitN(mainBranch, "/", 2)
+	if len(parts) != 2 {
+		return nil, errors.New("remote branch is expected in for <remote>/<branch>")
+	}
+
+	mainRef, err = repo.Reference(plumbing.NewRemoteReferenceName(parts[0], parts[1]), false)
+	if err != nil {
+		return nil, fmt.Errorf("remote ref: %w", err)
+	}
+
+	return mainRef, nil
 }

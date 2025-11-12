@@ -44,6 +44,8 @@ import (
 	_ "github.com/leonidboykov/go-mutesting/mutator/statement"
 )
 
+const md5Len = 32
+
 func debug(format string, args ...any) {
 	slog.Debug(fmt.Sprintf(format, args...))
 }
@@ -243,11 +245,12 @@ func executeMutesting(ctx context.Context, opts options) error {
 					continue
 				}
 
-				if len(line) != 32 {
+				if len(line) < md5Len {
 					return fmt.Errorf("%q is not a MD5 checksum", line)
 				}
 
-				mutationBlackList[line] = struct{}{}
+				// Use the first 32 chars. Everything else is considered as a comment.
+				mutationBlackList[line[:md5Len]] = struct{}{}
 			}
 		}
 	}
