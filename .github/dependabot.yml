@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: daily
+    groups:
+      minor-patch:
+        update-types: [minor, patch]
+    assignees: [leonidboykov]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+    groups:
+      minor-patch:
+        update-types: [minor, patch]
+    assignees: [leonidboykov]
