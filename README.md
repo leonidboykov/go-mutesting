@@ -1,4 +1,7 @@
-# go-mutesting [![GoDoc](https://godoc.org/github.com/leonidboykov/go-mutesting?status.png)](https://godoc.org/github.com/leonidboykov/go-mutesting) [![Build Status](https://travis-ci.org/avito-tech/go-mutesting.svg?branch=master)](https://travis-ci.org/avito-tech/go-mutesting) [![Coverage Status](https://coveralls.io/repos/avito-tech/go-mutesting/badge.png?branch=master)](https://coveralls.io/r/avito-tech/go-mutesting?branch=master)
+# go-mutesting
+[![Go Reference](https://pkg.go.dev/badge/github.com/leonidboykov/go-mutesting.svg)](https://pkg.go.dev/github.com/leonidboykov/go-mutesting)
+[![Go package](https://github.com/leonidboykov/go-mutesting/actions/workflows/go-test.yml/badge.svg)](https://github.com/leonidboykov/go-mutesting/actions/workflows/go-test.yml)
+[![codecov](https://codecov.io/github/leonidboykov/go-mutesting/graph/badge.svg?token=5MIQGV48K9)](https://codecov.io/github/leonidboykov/go-mutesting)
 
 go-mutesting is a framework for performing mutation testing on Go source code. Its main purpose is to find source code,
 which is not covered by any tests.
