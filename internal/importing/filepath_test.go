@@ -2,10 +2,12 @@ package importing
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFilesOfArgs(t *testing.T) {
@@ -243,11 +245,11 @@ func TestFilesWithExcludedDirs(t *testing.T) {
 // cleanupPaths is a helper to cleanup absolute paths.
 func cleanupPaths(t *testing.T, paths []string) []string {
 	t.Helper()
+	root, err := filepath.Abs("./../../..")
+	require.NoError(t, err, "project root")
 	result := make([]string, 0, len(paths))
 	for _, p := range paths {
-		if i := strings.Index(p, "go-mutesting"); i >= 0 {
-			result = append(result, p[i:])
-		}
+		result = append(result, strings.TrimPrefix(p, root+string(filepath.Separator)))
 	}
 	return result
 }
