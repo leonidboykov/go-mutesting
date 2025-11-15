@@ -3,12 +3,14 @@ package test
 import (
 	"bytes"
 	"fmt"
+	"go/ast"
 	"go/printer"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/tools/go/packages"
 
 	"github.com/leonidboykov/go-mutesting"
 	"github.com/leonidboykov/go-mutesting/internal/importing"
@@ -19,6 +21,8 @@ import (
 // It mutates the given original file with the given mutator. Every mutation is then validated with the given changed
 // file. The mutation overall count is validated with the given count.
 func Mutator(t *testing.T, m mutator.Mutator, testFile string, count int) {
+	t.Helper()
+
 	// Test if mutator is not nil
 	assert.NotNil(t, m)
 
@@ -36,7 +40,7 @@ func Mutator(t *testing.T, m mutator.Mutator, testFile string, count int) {
 	assert.Nil(t, m(pkg.Types, pkg.TypesInfo, src))
 
 	// Count the actual mutations
-	n := mutesting.CountWalk(pkg, src, m, skippedLines)
+	n := countWalk(pkg, src, m, skippedLines)
 	assert.Equal(t, count, n)
 
 	// Mutate all relevant nodes -> test whole mutation process
@@ -75,4 +79,18 @@ func Mutator(t *testing.T, m mutator.Mutator, testFile string, count int) {
 
 	_, ok := <-changed
 	assert.False(t, ok)
+}
+
+// countWalk returns the number of corresponding mutations for a given mutator. It traverses the AST of the given node
+// and calls the method Check of the given mutator for every node and sums up the returned counts. After completion of
+// the traversal the final counter is returned.
+func countWalk(pkg *packages.Package, node ast.Node, m mutator.Mutator, skippedLines map[int]struct{}) int {
+	var count int
+	for n := range ast.Preorder(node) {
+		line := pkg.Fset.Position(node.Pos()).Line
+		if _, ok := skippedLines[line]; !ok {
+			count += len(m(pkg.Types, pkg.TypesInfo, n))
+		}
+	}
+	return count
 }

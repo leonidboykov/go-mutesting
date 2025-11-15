@@ -10,20 +10,6 @@ import (
 	"github.com/leonidboykov/go-mutesting/mutator"
 )
 
-// CountWalk returns the number of corresponding mutations for a given mutator. It traverses the AST of the given node
-// and calls the method Check of the given mutator for every node and sums up the returned counts. After completion of
-// the traversal the final counter is returned.
-func CountWalk(pkg *packages.Package, node ast.Node, m mutator.Mutator, skippedLines map[int]struct{}) int {
-	var count int
-	for n := range ast.Preorder(node) {
-		line := pkg.Fset.Position(node.Pos()).Line
-		if _, ok := skippedLines[line]; !ok {
-			count += len(m(pkg.Types, pkg.TypesInfo, n))
-		}
-	}
-	return count
-}
-
 // PrintWalk traverses the AST of the given node and prints every node to STDOUT.
 func PrintWalk(node ast.Node) {
 	var level int
