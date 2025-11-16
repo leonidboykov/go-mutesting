@@ -43,42 +43,37 @@ func Mutator(t *testing.T, m mutator.Mutator, testFile string, count int) {
 	n := countWalk(pkg, src, m, skippedLines)
 	assert.Equal(t, count, n)
 
+	var funcCalledCount int
 	// Mutate all relevant nodes -> test whole mutation process
-	changed := mutesting.MutateWalk(pkg, src, m, skippedLines)
-
-	for i := range count {
-		assert.True(t, <-changed)
-
-		buf := new(bytes.Buffer)
-		err = printer.Fprint(buf, pkg.Fset, src)
-		assert.Nil(t, err)
-
-		dir := filepath.Dir(testFile)
-		fname := filepath.Base(testFile)
-		changedFilename := fmt.Sprintf("%s/_%s.%d.go", dir, fname, i)
-		changedFile, err := os.ReadFile(changedFilename)
-		assert.Nil(t, err)
-
-		if !assert.Equal(t, string(changedFile), buf.String(), fmt.Sprintf("For change file %q", changedFilename)) {
-			err = os.WriteFile(fmt.Sprintf("%s.%d.go.new", testFile, i), buf.Bytes(), 0644)
+	mutesting.MutateWalk(pkg, src, m, skippedLines,
+		func() {
+			buf := new(bytes.Buffer)
+			err = printer.Fprint(buf, pkg.Fset, src)
 			assert.Nil(t, err)
-		}
 
-		changed <- true
+			dir := filepath.Dir(testFile)
+			fname := filepath.Base(testFile)
+			changedFilename := fmt.Sprintf("%s/_%s.%d.go", dir, fname, funcCalledCount)
+			changedFile, err := os.ReadFile(changedFilename)
+			assert.Nil(t, err)
 
-		assert.True(t, <-changed)
+			if !assert.Equal(t, string(changedFile), buf.String(), fmt.Sprintf("For change file %q", changedFilename)) {
+				err = os.WriteFile(fmt.Sprintf("%s.%d.go.new", testFile, funcCalledCount), buf.Bytes(), 0644)
+				assert.Nil(t, err)
+			}
 
-		buf = new(bytes.Buffer)
-		err = printer.Fprint(buf, pkg.Fset, src)
-		assert.Nil(t, err)
+			funcCalledCount++
+		},
+		func() {
+			buf := new(bytes.Buffer)
+			err = printer.Fprint(buf, pkg.Fset, src)
+			assert.Nil(t, err)
 
-		assert.Equal(t, string(data), buf.String())
+			assert.Equal(t, string(data), buf.String())
+		},
+	)
 
-		changed <- true
-	}
-
-	_, ok := <-changed
-	assert.False(t, ok)
+	assert.Equal(t, count, funcCalledCount)
 }
 
 // countWalk returns the number of corresponding mutations for a given mutator. It traverses the AST of the given node

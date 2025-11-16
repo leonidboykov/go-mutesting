@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leonidboykov/go-mutesting/internal/importing"
-	"github.com/leonidboykov/go-mutesting/internal/models"
+	"github.com/leonidboykov/go-mutesting/internal/report"
 )
 
 func TestMainSimple(t *testing.T) {
@@ -80,7 +80,7 @@ func TestMainJSONReport(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	models.ReportFileName = jsonFile
+	report.ReportFileName = jsonFile
 
 	testMain(
 		t,
@@ -107,11 +107,11 @@ func TestMainJSONReport(t *testing.T) {
 	jsonData, err := os.ReadFile(jsonFile)
 	assert.NoError(t, err)
 
-	var mutationReport models.Report
+	var mutationReport report.Report
 	err = json.Unmarshal(jsonData, &mutationReport)
 	assert.NoError(t, err)
 
-	expectedStats := models.Stats{
+	expectedStats := report.Stats{
 		TotalMutantsCount:    60,
 		KilledCount:          35,
 		NotCoveredCount:      0,

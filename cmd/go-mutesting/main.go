@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -34,7 +33,7 @@ import (
 	"github.com/leonidboykov/go-mutesting/internal/diff"
 	"github.com/leonidboykov/go-mutesting/internal/execute"
 	"github.com/leonidboykov/go-mutesting/internal/importing"
-	"github.com/leonidboykov/go-mutesting/internal/models"
+	"github.com/leonidboykov/go-mutesting/internal/report"
 	"github.com/leonidboykov/go-mutesting/mutator"
 	_ "github.com/leonidboykov/go-mutesting/mutator/arithmetic"
 	_ "github.com/leonidboykov/go-mutesting/mutator/branch"
@@ -287,7 +286,7 @@ MUTATOR:
 		execs = strings.Fields(opts.exec)
 	}
 
-	report := &models.Report{}
+	rep := &report.Report{}
 
 	for _, file := range files {
 		verbose("Mutate %q", file)
@@ -321,11 +320,11 @@ MUTATOR:
 
 			for _, f := range astutil.Functions(src) {
 				if m.MatchString(f.Name.Name) {
-					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, f, tmpFile, execs, report)
+					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, f, tmpFile, execs, rep)
 				}
 			}
 		} else {
-			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, src, tmpFile, execs, report)
+			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, src, tmpFile, execs, rep)
 		}
 	}
 
@@ -337,54 +336,21 @@ MUTATOR:
 		debug("Remove %q", tmpDir)
 	}
 
-	report.Calculate()
+	rep.Calculate()
 
 	if !opts.noExec {
 		if !opts.silentMode {
-			fmt.Printf("The mutation score is %f (%d passed, %d failed, %d duplicated, %d skipped, total is %d)\n",
-				report.Stats.Msi,
-				report.Stats.KilledCount,
-				report.Stats.EscapedCount,
-				report.Stats.DuplicatedCount,
-				report.Stats.SkippedCount,
-				report.Stats.TotalMutantsCount,
-			)
+			fmt.Println(rep)
 		}
 	} else {
 		fmt.Println("Cannot do a mutation testing summary since no exec command was executed.")
 	}
 
-	if !opts.jsonOutput {
-		// Skip json output.
-		return nil
-	}
-
-	jsonContent, err := json.Marshal(report)
-	if err != nil {
-		return fmt.Errorf("marshal report: %w", err)
-	}
-
-	file, err := os.OpenFile(models.ReportFileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
-	if err != nil {
-		return fmt.Errorf("create report file: %w", err)
-	}
-	if file == nil {
-		return errors.New("cannot create file for report")
-	}
-
-	defer func() {
-		err = file.Close()
-		if err != nil {
-			slog.Error(fmt.Sprintf("error white report file closing: %s", err))
+	if opts.jsonOutput {
+		if err := rep.WriteToFile(); err != nil {
+			return fmt.Errorf("write report: %w", err)
 		}
-	}()
-
-	_, err = file.WriteString(string(jsonContent))
-	if err != nil {
-		return fmt.Errorf("write report: %w", err)
 	}
-
-	verbose("Save report into %q", models.ReportFileName)
 
 	return nil
 }
@@ -401,28 +367,20 @@ func mutate(
 	node ast.Node,
 	mutatedFile string,
 	execs []string,
-	stats *models.Report,
+	stats *report.Report,
 ) int {
 	skippedLines := importing.Skips(pkg.Fset, src)
 
 	for _, m := range mutators {
 		debug("Mutator %s", m.Name)
 
-		changed := mutesting.MutateWalk(pkg, node, m.Mutator, skippedLines)
-
-		for {
-			_, ok := <-changed
-
-			if !ok {
-				break
-			}
-
+		mutesting.MutateWalk(pkg, node, m.Mutator, skippedLines, func() {
 			originalSourceCode, err := os.ReadFile(originalFile)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			mutant := models.Mutant{}
+			mutant := report.Mutant{}
 			mutant.Mutator.MutatorName = m.Name
 			mutant.Mutator.OriginalFilePath = originalFile
 			mutant.Mutator.OriginalSourceCode = string(originalSourceCode)
@@ -496,15 +454,8 @@ func mutate(
 					}
 				}
 			}
-
-			changed <- true
-
-			// Ignore original state
-			<-changed
-			changed <- true
-
 			mutationID++
-		}
+		}, func() {})
 	}
 
 	return mutationID
@@ -517,7 +468,7 @@ func mutateExec(
 	file string,
 	mutationFile string,
 	execs []string,
-	mutant *models.Mutant,
+	mutant *report.Mutant,
 ) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(opts.execTimeout)*time.Second)
 	defer cancel()
