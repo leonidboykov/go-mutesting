@@ -16,7 +16,7 @@ jobs:
       - name: Run tests
         run: >-
           go test -race -coverprofile=coverage.txt -covermode=atomic 2>&1 ./... |
-          go-junit-report -set-exit-code -out junit.xml
+          go-junit-report -set-exit-code -out report.junit.xml
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
