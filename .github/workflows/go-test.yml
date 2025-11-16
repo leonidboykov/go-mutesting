@@ -16,13 +16,13 @@ jobs:
       - name: Run tests
         run: >-
           go test -race -coverprofile=coverage.txt -covermode=atomic 2>&1 ./... |
-          go-junit-report -set-exit-code -out report.xml
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          go-junit-report -set-exit-code -out junit.xml
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
