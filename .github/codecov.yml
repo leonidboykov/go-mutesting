@@ -1,0 +1,2 @@
+ignore:
+  - test/ # This is a test-suite for mutators.
