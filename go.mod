@@ -11,6 +11,7 @@ require (
 	github.com/urfave/cli-altsrc/v3 v3.1.0
 	github.com/urfave/cli/v3 v3.6.0
 	golang.org/x/tools v0.39.0
+	pgregory.net/rapid v1.2.0
 )
 
 require (
