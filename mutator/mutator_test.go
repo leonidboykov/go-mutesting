@@ -3,6 +3,7 @@ package mutator
 import (
 	"go/ast"
 	"go/types"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,14 +31,7 @@ func TestMockMutator(t *testing.T) {
 	Register("mock", mockMutator)
 
 	// Mock is registered
-	found := false
-	for _, name := range List() {
-		if name == "mock" {
-			found = true
-
-			break
-		}
-	}
+	found := slices.Contains(List(), "mock")
 	assert.True(t, found)
 
 	m, err = New("mock")
@@ -45,28 +39,8 @@ func TestMockMutator(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Register mock a second time
-	caught := false
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				caught = true
-			}
-		}()
-
-		Register("mock", mockMutator)
-	}()
-	assert.True(t, caught)
+	assert.Panics(t, func() { Register("mock", mockMutator) })
 
 	// Register nil function
-	caught = false
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				caught = true
-			}
-		}()
-
-		Register("mockachino", nil)
-	}()
-	assert.True(t, caught)
+	assert.Panics(t, func() { Register("mockachino", nil) })
 }
