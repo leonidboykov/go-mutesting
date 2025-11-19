@@ -222,21 +222,53 @@ type options struct {
 }
 
 func executeMutesting(ctx context.Context, opts options) error {
-	var mutationBlackList = map[string]struct{}{}
+	rep, err := ExecuteMutesting(ctx, opts)
+	if err != nil {
+		return fmt.Errorf("execute mutesting: %w", err)
+	}
+
+	if !opts.noExec {
+		if !opts.silentMode {
+			fmt.Println(rep)
+		}
+	} else {
+		fmt.Println("Cannot do a mutation testing summary since no exec command was executed.")
+	}
+
+	if opts.jsonOutput {
+		if err := rep.WriteToFile(); err != nil {
+			return fmt.Errorf("write report: %w", err)
+		}
+	}
+
+	if opts.jsonOutput {
+		if err := rep.WriteToFile(); err != nil {
+			return fmt.Errorf("write report file: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func ExecuteMutesting(ctx context.Context, opts options) (report.Report, error) {
+	var (
+		rep               report.Report
+		mutationBlackList = map[string]struct{}{}
+	)
 
 	files, err := importing.FilesOfArgs(opts.args, opts.importingOpts)
 	if err != nil {
-		return fmt.Errorf("load packages: %w", err)
+		return rep, fmt.Errorf("load packages: %w", err)
 	}
 	if len(files) == 0 {
-		return errors.New("could not find any suitable Go source files")
+		return rep, errors.New("could not find any suitable Go source files")
 	}
 
 	if len(opts.blacklist) > 0 {
 		for _, f := range opts.blacklist {
 			c, err := os.ReadFile(f)
 			if err != nil {
-				return fmt.Errorf("read blacklist file %q: %w", f, err)
+				return rep, fmt.Errorf("read blacklist file %q: %w", f, err)
 			}
 
 			for line := range strings.SplitSeq(string(c), "\n") {
@@ -245,7 +277,7 @@ func executeMutesting(ctx context.Context, opts options) error {
 				}
 
 				if len(line) < md5Len {
-					return fmt.Errorf("%q is not a MD5 checksum", line)
+					return rep, fmt.Errorf("%q is not a MD5 checksum", line)
 				}
 
 				// Use the first 32 chars. Everything else is considered as a comment.
@@ -286,14 +318,12 @@ MUTATOR:
 		execs = strings.Fields(opts.exec)
 	}
 
-	rep := &report.Report{}
-
 	for _, file := range files {
 		verbose("Mutate %q", file)
 
 		src, pkg, err := importing.ParseAndTypeCheckFile(file)
 		if err != nil {
-			return fmt.Errorf("parse file: %w", err)
+			return rep, fmt.Errorf("parse file: %w", err)
 		}
 
 		err = os.MkdirAll(filepath.Join(tmpDir, filepath.Dir(file)), 0755)
@@ -315,16 +345,16 @@ MUTATOR:
 		if opts.match != "" {
 			m, err := regexp.Compile(opts.match)
 			if err != nil {
-				return fmt.Errorf("match regex is not valid: %w", err)
+				return rep, fmt.Errorf("match regex is not valid: %w", err)
 			}
 
 			for _, f := range astutil.Functions(src) {
 				if m.MatchString(f.Name.Name) {
-					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, f, tmpFile, execs, rep)
+					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, f, tmpFile, execs, &rep)
 				}
 			}
 		} else {
-			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, src, tmpFile, execs, rep)
+			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, src, tmpFile, execs, &rep)
 		}
 	}
 
@@ -338,21 +368,7 @@ MUTATOR:
 
 	rep.Calculate()
 
-	if !opts.noExec {
-		if !opts.silentMode {
-			fmt.Println(rep)
-		}
-	} else {
-		fmt.Println("Cannot do a mutation testing summary since no exec command was executed.")
-	}
-
-	if opts.jsonOutput {
-		if err := rep.WriteToFile(); err != nil {
-			return fmt.Errorf("write report: %w", err)
-		}
-	}
-
-	return nil
+	return rep, nil
 }
 
 func mutate(
