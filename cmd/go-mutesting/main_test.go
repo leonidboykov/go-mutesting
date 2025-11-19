@@ -12,7 +12,7 @@ import (
 )
 
 func TestExecuteMutesting(t *testing.T) {
-	// DO NOT use `debug: true` in options, go-junit-report will consider tests as failed due to FAIL keyword.
+	// DO NOT use `debug: true` in options, go-junit-report will fail tests as killed tests produces failed output on debug.
 	tt := []struct {
 		name          string
 		root          string
