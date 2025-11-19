@@ -15,8 +15,8 @@ jobs:
         run: go install github.com/jstemmer/go-junit-report/v2@latest
       - name: Run tests
         run: >-
-          go test -race -v -json -coverprofile=coverage.txt -covermode=atomic 2>&1 ./... |
-          go-junit-report -parser gojson -set-exit-code -out report.junit.xml
+          go test -race -v -coverprofile=coverage.txt -covermode=atomic 2>&1 ./... |
+          go-junit-report -set-exit-code -out report.junit.xml
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
