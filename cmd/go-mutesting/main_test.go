@@ -12,6 +12,7 @@ import (
 )
 
 func TestExecuteMutesting(t *testing.T) {
+	// DO NOT use `debug: true` in options, go-junit-report will consider tests as failed due to FAIL keyword.
 	tt := []struct {
 		name          string
 		root          string
@@ -29,28 +30,28 @@ func TestExecuteMutesting(t *testing.T) {
 		{
 			name:          "recursive",
 			root:          "../../example",
-			opts:          options{args: []string{"./..."}, debug: true, execTimeout: 10},
+			opts:          options{args: []string{"./..."}, execTimeout: 10},
 			expectedErr:   "",
 			expectedStats: report.Stats{Msi: 0.600000, KilledCount: 39, EscapedCount: 26, DuplicatedCount: 7, SkippedCount: 0, TotalMutantsCount: 65},
 		},
 		{
 			name:          "from other directory",
 			root:          "../..",
-			opts:          options{args: []string{"github.com/leonidboykov/go-mutesting/example"}, debug: true, execTimeout: 10},
+			opts:          options{args: []string{"github.com/leonidboykov/go-mutesting/example"}, execTimeout: 10},
 			expectedStats: report.Stats{Msi: 0.573770, KilledCount: 35, EscapedCount: 26, DuplicatedCount: 7, SkippedCount: 0, TotalMutantsCount: 61},
 			expectedErr:   "",
 		},
 		{
 			name:          "match",
 			root:          "../../example",
-			opts:          options{args: []string{"./..."}, debug: true, execTimeout: 10, exec: "../scripts/exec/test-mutated-package.sh", match: "baz"},
+			opts:          options{args: []string{"./..."}, execTimeout: 10, exec: "../scripts/exec/test-mutated-package.sh", match: "baz"},
 			expectedStats: report.Stats{Msi: 0.500000, KilledCount: 4, EscapedCount: 4, DuplicatedCount: 0, SkippedCount: 0, TotalMutantsCount: 8},
 			expectedErr:   "",
 		},
 		{
 			name: "skip without tests",
 			root: "../../example",
-			opts: options{args: []string{}, debug: true, execTimeout: 10, importingOpts: importing.Options{
+			opts: options{args: []string{}, execTimeout: 10, importingOpts: importing.Options{
 				SkipFileWithoutTest:  true,
 				SkipFileWithBuildTag: true,
 			}},
