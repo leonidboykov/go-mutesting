@@ -1,4 +1,11 @@
-package models
+package report
+
+import (
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"os"
+)
 
 // ReportFileName File name for json report
 var ReportFileName string = "report.json"
@@ -44,23 +51,52 @@ type Mutator struct {
 }
 
 // Calculate calculation for final report
-func (report *Report) Calculate() {
-	report.Stats.Msi = report.MsiScore()
-	report.Stats.TotalMutantsCount = report.TotalCount()
+func (r *Report) Calculate() {
+	r.Stats.Msi = r.MsiScore()
+	r.Stats.TotalMutantsCount = r.TotalCount()
 }
 
 // MsiScore msi score calculation
-func (report *Report) MsiScore() float64 {
-	total := report.TotalCount()
+func (r *Report) MsiScore() float64 {
+	total := r.TotalCount()
 
 	if total == 0 {
 		return 0.0
 	}
 
-	return float64(report.Stats.KilledCount+report.Stats.ErrorCount+report.Stats.SkippedCount) / float64(total)
+	return float64(r.Stats.KilledCount+r.Stats.ErrorCount+r.Stats.SkippedCount) / float64(total)
 }
 
 // TotalCount total mutations count
-func (report *Report) TotalCount() int64 {
-	return report.Stats.KilledCount + report.Stats.EscapedCount + report.Stats.ErrorCount + report.Stats.SkippedCount
+func (r *Report) TotalCount() int64 {
+	return r.Stats.KilledCount + r.Stats.EscapedCount + r.Stats.ErrorCount + r.Stats.SkippedCount
+}
+
+// String implements [fmt.Stringer] interface.
+func (r *Report) String() string {
+	return fmt.Sprintf("The mutation score is %f (%d passed, %d failed, %d duplicated, %d skipped, total is %d)",
+		r.Stats.Msi,
+		r.Stats.KilledCount,
+		r.Stats.EscapedCount,
+		r.Stats.DuplicatedCount,
+		r.Stats.SkippedCount,
+		r.Stats.TotalMutantsCount,
+	)
+}
+
+// WriteToFile writes report file to [ReportFileName].
+func (r *Report) WriteToFile() error {
+	file, err := os.OpenFile(ReportFileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	if err != nil {
+		return fmt.Errorf("creaate file: %w", err)
+	}
+	defer file.Close()
+
+	if err := json.NewEncoder(file).Encode(r); err != nil {
+		return fmt.Errorf("encode json: %w", err)
+	}
+
+	slog.Info("save report file", slog.String("name", ReportFileName))
+
+	return nil
 }
