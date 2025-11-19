@@ -3,6 +3,7 @@ package importing
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -252,4 +253,14 @@ func cleanupPaths(t *testing.T, paths []string) []string {
 		result = append(result, strings.TrimPrefix(p, root+string(filepath.Separator)))
 	}
 	return result
+}
+
+func Test_skipUnchangedFiles(t *testing.T) {
+	t.Parallel()
+	files := []string{"file_1.go", "file_2.go", "file_3.go", "file_4.go"}
+	changed := []string{"file_1.go", "file_3.go", "file_5.go"}
+	assert.Equal(t,
+		[]string{"file_1.go", "file_3.go"},
+		slices.Collect(skipUnchangedFiles(slices.Values(files), changed)),
+	)
 }
