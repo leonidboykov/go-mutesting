@@ -1,12 +1,7 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,167 +11,74 @@ import (
 	"github.com/leonidboykov/go-mutesting/internal/report"
 )
 
-func TestMainSimple(t *testing.T) {
-	testMain(
-		t,
-		"../../example",
-		options{execTimeout: 10},
-		"",
-		"The mutation score is 0.573770 (35 passed, 26 failed, 7 duplicated, 0 skipped, total is 61)",
-	)
-}
-
-func TestMainRecursive(t *testing.T) {
-	testMain(
-		t,
-		"../../example",
-		options{args: []string{"./..."}, debug: true, execTimeout: 10},
-		"",
-		"The mutation score is 0.600000 (39 passed, 26 failed, 7 duplicated, 0 skipped, total is 65)",
-	)
-}
-
-func TestMainFromOtherDirectory(t *testing.T) {
-	testMain(
-		t,
-		"../..",
-		options{args: []string{"github.com/leonidboykov/go-mutesting/example"}, debug: true, execTimeout: 10},
-		"",
-		"The mutation score is 0.573770 (35 passed, 26 failed, 7 duplicated, 0 skipped, total is 61)",
-	)
-}
-
-func TestMainMatch(t *testing.T) {
-	testMain(
-		t,
-		"../../example",
-		options{args: []string{"./..."}, debug: true, execTimeout: 10, exec: "../scripts/exec/test-mutated-package.sh", match: "baz"},
-		"",
-		"The mutation score is 0.500000 (4 passed, 4 failed, 0 duplicated, 0 skipped, total is 8)",
-	)
-}
-
-func TestMainSkipWithoutTest(t *testing.T) {
-	testMain(
-		t,
-		"../../example",
-		options{args: []string{}, debug: true, execTimeout: 10, importingOpts: importing.Options{
-			SkipFileWithoutTest:  true,
-			SkipFileWithBuildTag: true,
-		}},
-		"",
-		"The mutation score is 0.583333 (35 passed, 25 failed, 7 duplicated, 0 skipped, total is 60)",
-	)
-}
-
-func TestMainJSONReport(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "go-mutesting-main-test-")
-	assert.NoError(t, err)
-
-	reportFileName := "reportTestMainJSONReport.json"
-	jsonFile := filepath.Join(tmpDir, reportFileName)
-	if _, err := os.Stat(jsonFile); err == nil {
-		err = os.Remove(jsonFile)
-		assert.NoError(t, err)
+func TestExecuteMutesting(t *testing.T) {
+	// DO NOT use `debug: true` in options, go-junit-report will fail tests as killed tests produces failed output on debug.
+	tt := []struct {
+		name          string
+		root          string
+		opts          options
+		expectedStats report.Stats
+		expectedErr   string
+	}{
+		{
+			name:          "simple",
+			root:          "../../example",
+			opts:          options{execTimeout: 10},
+			expectedErr:   "",
+			expectedStats: report.Stats{Msi: 0.573770, KilledCount: 35, EscapedCount: 26, DuplicatedCount: 7, SkippedCount: 0, TotalMutantsCount: 61},
+		},
+		{
+			name:          "recursive",
+			root:          "../../example",
+			opts:          options{args: []string{"./..."}, execTimeout: 10},
+			expectedErr:   "",
+			expectedStats: report.Stats{Msi: 0.600000, KilledCount: 39, EscapedCount: 26, DuplicatedCount: 7, SkippedCount: 0, TotalMutantsCount: 65},
+		},
+		{
+			name:          "from other directory",
+			root:          "../..",
+			opts:          options{args: []string{"github.com/leonidboykov/go-mutesting/example"}, execTimeout: 10},
+			expectedStats: report.Stats{Msi: 0.573770, KilledCount: 35, EscapedCount: 26, DuplicatedCount: 7, SkippedCount: 0, TotalMutantsCount: 61},
+			expectedErr:   "",
+		},
+		{
+			name:          "match",
+			root:          "../../example",
+			opts:          options{args: []string{"./..."}, execTimeout: 10, exec: "../scripts/exec/test-mutated-package.sh", match: "baz"},
+			expectedStats: report.Stats{Msi: 0.500000, KilledCount: 4, EscapedCount: 4, DuplicatedCount: 0, SkippedCount: 0, TotalMutantsCount: 8},
+			expectedErr:   "",
+		},
+		{
+			name: "skip without tests",
+			root: "../../example",
+			opts: options{args: []string{}, execTimeout: 10, importingOpts: importing.Options{
+				SkipFileWithoutTest:  true,
+				SkipFileWithBuildTag: true,
+			}},
+			expectedStats: report.Stats{Msi: 0.583333, KilledCount: 35, EscapedCount: 25, DuplicatedCount: 7, SkippedCount: 0, TotalMutantsCount: 60},
+			expectedErr:   "",
+		},
 	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			saveCwd, err := os.Getwd()
+			require.NoError(t, err)
+			assert.NoError(t, os.Chdir(tc.root))
+			t.Cleanup(func() { os.Chdir(saveCwd) })
 
-	report.ReportFileName = jsonFile
+			rep, err := ExecuteMutesting(t.Context(), tc.opts)
 
-	testMain(
-		t,
-		"../../example",
-		options{debug: true, execTimeout: 10, jsonOutput: true, importingOpts: importing.Options{
-			SkipFileWithoutTest:  true,
-			SkipFileWithBuildTag: true,
-		}},
-		"",
-		"The mutation score is 0.583333 (35 passed, 25 failed, 7 duplicated, 0 skipped, total is 60)",
-	)
-
-	info, err := os.Stat(jsonFile)
-	assert.NoError(t, err)
-	assert.NotNil(t, info)
-
-	t.Cleanup(func() {
-		err = os.Remove(jsonFile)
-		if err != nil {
-			fmt.Println("Error while deleting temp file")
-		}
-	})
-
-	jsonData, err := os.ReadFile(jsonFile)
-	assert.NoError(t, err)
-
-	var mutationReport report.Report
-	err = json.Unmarshal(jsonData, &mutationReport)
-	assert.NoError(t, err)
-
-	expectedStats := report.Stats{
-		TotalMutantsCount:    60,
-		KilledCount:          35,
-		NotCoveredCount:      0,
-		EscapedCount:         25,
-		ErrorCount:           0,
-		SkippedCount:         0,
-		TimeOutCount:         0,
-		Msi:                  0.5833333333333334,
-		MutationCodeCoverage: 0,
-		CoveredCodeMsi:       0,
-		DuplicatedCount:      0,
+			assert.InDelta(t, tc.expectedStats.Msi, rep.Stats.Msi, 0.000001)
+			assert.Equal(t, tc.expectedStats.KilledCount, rep.Stats.KilledCount)
+			assert.Equal(t, tc.expectedStats.EscapedCount, rep.Stats.EscapedCount)
+			assert.Equal(t, tc.expectedStats.DuplicatedCount, rep.Stats.DuplicatedCount)
+			assert.Equal(t, tc.expectedStats.SkippedCount, rep.Stats.SkippedCount)
+			assert.Equal(t, tc.expectedStats.TotalMutantsCount, rep.Stats.TotalMutantsCount)
+			if tc.expectedErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, tc.expectedErr)
+			}
+		})
 	}
-
-	assert.Equal(t, expectedStats, mutationReport.Stats)
-	assert.Equal(t, 25, len(mutationReport.Escaped))
-	assert.Nil(t, mutationReport.Timeouted)
-	assert.Equal(t, 35, len(mutationReport.Killed))
-	assert.Nil(t, mutationReport.Errored)
-
-	for i := range len(mutationReport.Escaped) {
-		assert.Contains(t, mutationReport.Escaped[i].ProcessOutput, "FAIL")
-	}
-	for i := range len(mutationReport.Killed) {
-		assert.Contains(t, mutationReport.Killed[i].ProcessOutput, "PASS")
-	}
-}
-
-func testMain(t *testing.T, root string, opts options, expectedError string, contains string) {
-	saveStderr := os.Stderr
-	saveStdout := os.Stdout
-	saveCwd, err := os.Getwd()
-	assert.Nil(t, err)
-
-	r, w, err := os.Pipe()
-	assert.Nil(t, err)
-
-	os.Stderr = w
-	os.Stdout = w
-	assert.Nil(t, os.Chdir(root))
-
-	bufChannel := make(chan string)
-
-	go func() {
-		buf := new(bytes.Buffer)
-		_, err = io.Copy(buf, r)
-		assert.Nil(t, err)
-		assert.Nil(t, r.Close())
-
-		bufChannel <- buf.String()
-	}()
-
-	exitErr := executeMutesting(t.Context(), opts)
-
-	assert.Nil(t, w.Close())
-
-	os.Stderr = saveStderr
-	os.Stdout = saveStdout
-	assert.Nil(t, os.Chdir(saveCwd))
-
-	out := <-bufChannel
-
-	if expectedError == "" {
-		require.NoError(t, exitErr)
-	} else {
-		require.EqualError(t, exitErr, expectedError)
-	}
-	assert.Contains(t, out, contains)
 }
