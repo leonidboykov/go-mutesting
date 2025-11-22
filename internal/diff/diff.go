@@ -36,7 +36,6 @@ func CompareStrings(original, mutated, mutatorName string) (string, error) {
 		return "", fmt.Errorf("get diff: %w", err)
 	}
 
-	// TODO: Allow to disable color output.
 	return colorDiff(diff), nil
 }
 
