@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/lmittmann/tint"
 	altsrc "github.com/urfave/cli-altsrc/v3"
 	yamlsrc "github.com/urfave/cli-altsrc/v3/yaml"
@@ -45,17 +46,15 @@ import (
 
 const md5Len = 32
 
-func debug(format string, args ...any) {
-	slog.Debug(fmt.Sprintf(format, args...))
-}
-
-func verbose(format string, args ...any) {
-	slog.Info(fmt.Sprintf(format, args...))
-}
-
 type mutatorItem struct {
 	Name    string
 	Mutator mutator.Mutator
+}
+
+func init() {
+	if os.Getenv("FORCE_COLOR") != "" {
+		color.NoColor = false
+	}
 }
 
 func main() {
@@ -68,7 +67,7 @@ func main() {
 		Level:      logLevel,
 		TimeFormat: time.DateTime,
 	})))
-	slog.SetLogLoggerLevel(slog.LevelError)
+	slog.SetLogLoggerLevel(slog.LevelDebug)
 
 	var configFile string
 	if err := (&cli.Command{
@@ -250,25 +249,25 @@ func executeMutesting(ctx context.Context, opts options) error {
 	return nil
 }
 
-func ExecuteMutesting(ctx context.Context, opts options) (report.Report, error) {
+func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error) {
 	var (
-		rep               report.Report
+		rep               = new(report.Report)
 		mutationBlackList = map[string]struct{}{}
 	)
 
 	files, err := importing.FilesOfArgs(opts.args, opts.importingOpts)
 	if err != nil {
-		return rep, fmt.Errorf("load packages: %w", err)
+		return nil, fmt.Errorf("load packages: %w", err)
 	}
 	if len(files) == 0 {
-		return rep, errors.New("could not find any suitable Go source files")
+		return nil, errors.New("could not find any suitable Go source files")
 	}
 
 	if len(opts.blacklist) > 0 {
 		for _, f := range opts.blacklist {
 			c, err := os.ReadFile(f)
 			if err != nil {
-				return rep, fmt.Errorf("read blacklist file %q: %w", f, err)
+				return nil, fmt.Errorf("read blacklist file %q: %w", f, err)
 			}
 
 			for line := range strings.SplitSeq(string(c), "\n") {
@@ -277,7 +276,7 @@ func ExecuteMutesting(ctx context.Context, opts options) (report.Report, error) 
 				}
 
 				if len(line) < md5Len {
-					return rep, fmt.Errorf("%q is not a MD5 checksum", line)
+					return nil, fmt.Errorf("%q is not a MD5 checksum", line)
 				}
 
 				// Use the first 32 chars. Everything else is considered as a comment.
@@ -298,7 +297,7 @@ MUTATOR:
 			}
 		}
 
-		verbose("Enable mutator %q", name)
+		slog.Info("enable mutator", slog.String("name", name))
 
 		m, _ := mutator.New(name)
 		mutators = append(mutators, mutatorItem{
@@ -311,7 +310,7 @@ MUTATOR:
 	if err != nil {
 		panic(err)
 	}
-	verbose("Save mutations into %q", tmpDir)
+	slog.Info(fmt.Sprintf("save mutations into %q", tmpDir))
 
 	var execs []string
 	if opts.exec != "" {
@@ -319,7 +318,7 @@ MUTATOR:
 	}
 
 	for _, file := range files {
-		verbose("Mutate %q", file)
+		slog.Info("mutate", slog.String("file", file))
 
 		src, pkg, err := importing.ParseAndTypeCheckFile(file)
 		if err != nil {
@@ -338,7 +337,7 @@ MUTATOR:
 		if err != nil {
 			panic(err)
 		}
-		debug("Save original into %q", originalFile)
+		log.Printf("Save original into %q", originalFile)
 
 		mutationID := 0
 
@@ -350,11 +349,11 @@ MUTATOR:
 
 			for _, f := range astutil.Functions(src) {
 				if m.MatchString(f.Name.Name) {
-					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, f, tmpFile, execs, &rep)
+					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, f, tmpFile, execs, rep)
 				}
 			}
 		} else {
-			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, src, tmpFile, execs, &rep)
+			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, src, tmpFile, execs, rep)
 		}
 	}
 
@@ -363,7 +362,7 @@ MUTATOR:
 		if err != nil {
 			panic(err)
 		}
-		debug("Remove %q", tmpDir)
+		log.Printf("Remove %q", tmpDir)
 	}
 
 	rep.Calculate()
@@ -388,7 +387,7 @@ func mutate(
 	skippedLines := importing.Skips(pkg.Fset, src)
 
 	for _, m := range mutators {
-		debug("Mutator %s", m.Name)
+		log.Printf("Mutator %s", m.Name)
 
 		mutesting.MutateWalk(pkg, node, m.Mutator, skippedLines, func() {
 			originalSourceCode, err := os.ReadFile(originalFile)
@@ -406,11 +405,11 @@ func mutate(
 			if err != nil {
 				fmt.Printf("INTERNAL ERROR %s\n", err.Error())
 			} else if duplicate {
-				debug("%q is a duplicate, we ignore it", mutationFile)
+				log.Printf("%q is a duplicate, we ignore it", mutationFile)
 
 				stats.Stats.DuplicatedCount++
 			} else {
-				debug("Save mutation into %q with checksum %s", mutationFile, checksum)
+				log.Printf("Save mutation into %q with checksum %s", mutationFile, checksum)
 
 				if !opts.noExec {
 					mutationError := mutateExec(ctx, opts, pkg.Types, originalFile, mutationFile, execs, &mutant)
@@ -431,7 +430,7 @@ func mutate(
 					case mutationError == nil: // Tests failed - all ok
 						out := fmt.Sprintf("PASS %s\n", msg)
 						if !opts.silentMode {
-							fmt.Print(out)
+							fmt.Println(color.GreenString("✓ PASS"), msg)
 						}
 
 						mutant.ProcessOutput = out
@@ -440,7 +439,7 @@ func mutate(
 					case errors.Is(mutationError, execute.ErrMutationSurvived): // Tests passed
 						out := fmt.Sprintf("FAIL %s\n", msg)
 						if !opts.silentMode {
-							fmt.Print(out)
+							fmt.Println(color.RedString("✗ FAIL"), msg)
 						}
 
 						mutant.ProcessOutput = out
@@ -450,7 +449,7 @@ func mutate(
 						errors.Is(mutationError, context.DeadlineExceeded): // Did not compile
 						out := fmt.Sprintf("SKIP %s\n", msg)
 						if !opts.silentMode {
-							fmt.Print(out)
+							fmt.Println("~ SKIP", msg)
 						}
 
 						mutant.ProcessOutput = out
@@ -490,7 +489,7 @@ func mutateExec(
 	defer cancel()
 
 	if len(execs) == 0 {
-		debug("Execute built-in exec command for mutation")
+		log.Printf("Execute built-in exec command for mutation")
 
 		diffStr, err := diff.CompareFiles(file, mutationFile, mutant.Mutator.MutatorName)
 		if err != nil {
@@ -538,7 +537,7 @@ func mutateExec(
 		return err
 	}
 
-	debug("Execute %q for mutation", opts.exec)
+	log.Printf("Execute %q for mutation", opts.exec)
 
 	if err := execute.Custom(ctx, execs, execute.CustomMutationOptions{
 		Changed:       mutationFile,

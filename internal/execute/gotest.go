@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -28,7 +29,9 @@ func GoTest(ctx context.Context, pkgName string, recursive bool) error {
 
 	output, err := cmd.CombinedOutput()
 
-	slog.Debug("test result", slog.String("output", string(output)))
+	if slog.Default().Enabled(ctx, slog.LevelDebug) {
+		fmt.Fprintln(os.Stderr, string(output))
+	}
 
 	if err == nil {
 		// No errors, mutaton survived.
