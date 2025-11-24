@@ -46,6 +46,8 @@ import (
 
 const md5Len = 32
 
+var errMutantsEscaped = errors.New("mutants escaped")
+
 type mutatorItem struct {
 	Name    string
 	Mutator mutator.Mutator
@@ -159,6 +161,10 @@ func main() {
 				Name:  "git-branch",
 				Usage: "check only files changed against specified git branch",
 			},
+			&cli.BoolFlag{
+				Name:  "error-on-survivals",
+				Usage: "return exit code 1 if there are survived mutations",
+			},
 		},
 		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
 			switch {
@@ -193,13 +199,17 @@ func main() {
 					GitMainBranch:        c.String("git-branch"),
 					ExcludeDirs:          c.StringArgs("exclude-dirs"),
 				},
-				debug:      c.Bool("debug"),
-				verbose:    c.Bool("verbose"),
-				jsonOutput: c.Bool("json_output"),
+				exitCodeOnSurvivals: c.Bool("error-on-survivals"),
+				debug:               c.Bool("debug"),
+				verbose:             c.Bool("verbose"),
+				jsonOutput:          c.Bool("json_output"),
 			})
 		},
 	}).Run(ctx, os.Args); err != nil {
-		log.Println(err)
+		if !errors.Is(err, errMutantsEscaped) {
+			slog.Error(err.Error())
+		}
+		os.Exit(1)
 	}
 }
 
@@ -216,6 +226,7 @@ type options struct {
 	noExec               bool
 	execTimeout          uint
 	jsonOutput           bool
+	exitCodeOnSurvivals  bool
 	debug                bool
 	verbose              bool
 }
@@ -244,6 +255,10 @@ func executeMutesting(ctx context.Context, opts options) error {
 		if err := rep.WriteToFile(); err != nil {
 			return fmt.Errorf("write report file: %w", err)
 		}
+	}
+
+	if opts.exitCodeOnSurvivals && rep.Stats.EscapedCount > 0 {
+		return errMutantsEscaped
 	}
 
 	return nil
