@@ -275,7 +275,8 @@ func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error)
 		return nil, fmt.Errorf("load packages: %w", err)
 	}
 	if len(files) == 0 {
-		return nil, errors.New("could not find any suitable Go source files")
+		slog.Warn("could not find any suitable Go source files")
+		return nil, nil
 	}
 
 	if len(opts.blacklist) > 0 {
