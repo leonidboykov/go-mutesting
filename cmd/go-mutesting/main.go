@@ -276,7 +276,7 @@ func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error)
 	}
 	if len(files) == 0 {
 		slog.Warn("could not find any suitable Go source files")
-		return nil, nil
+		return rep, nil
 	}
 
 	if len(opts.blacklist) > 0 {
