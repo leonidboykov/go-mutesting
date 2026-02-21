@@ -3,9 +3,9 @@ package sub
 import (
 	"testing"
 
-	. "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBaz(t *testing.T) {
-	Equal(t, baz(), 2)
+	assert.Equal(t, baz(), 2)
 }
