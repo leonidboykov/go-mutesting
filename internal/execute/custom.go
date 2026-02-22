@@ -12,7 +12,7 @@ import (
 type CustomMutationOptions struct {
 	Changed       string
 	Original      string
-	Package       string
+	PackagePath   string
 	Debug         bool
 	Verbose       bool
 	Timeout       uint
@@ -25,7 +25,7 @@ func Custom(ctx context.Context, execArgs []string, opts CustomMutationOptions) 
 	cmd.Env = append(os.Environ(), []string{
 		"MUTATE_CHANGED=" + opts.Changed,
 		"MUTATE_ORIGINAL=" + opts.Original,
-		"MUTATE_PACKAGE=" + opts.Package,
+		"MUTATE_PACKAGE=" + opts.PackagePath,
 		"MUTATE_DEBUG=" + strconv.FormatBool(opts.Debug),
 		"MUTATE_VERBOSE=" + strconv.FormatBool(opts.Verbose),
 		"MUTATE_TIMEOUT=" + strconv.FormatUint(uint64(opts.Timeout), 10),

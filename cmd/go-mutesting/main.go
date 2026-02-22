@@ -31,7 +31,6 @@ import (
 
 	"github.com/leonidboykov/go-mutesting"
 	"github.com/leonidboykov/go-mutesting/internal/astutil"
-	"github.com/leonidboykov/go-mutesting/internal/diff"
 	"github.com/leonidboykov/go-mutesting/internal/execute"
 	"github.com/leonidboykov/go-mutesting/internal/importing"
 	"github.com/leonidboykov/go-mutesting/internal/report"
@@ -507,61 +506,25 @@ func mutateExec(
 	if len(execs) == 0 {
 		log.Printf("Execute built-in exec command for mutation")
 
-		diffStr, err := diff.CompareFiles(file, mutationFile, mutant.Mutator.MutatorName)
-		if err != nil {
-			panic(err) // TODO: Do not panic on every error.
-		}
-
-		defer func() {
-			_ = os.Rename(file+".tmp", file)
-		}()
-
-		err = os.Rename(file, file+".tmp")
-		if err != nil {
-			panic(err)
-		}
-		err = CopyFile(mutationFile, file)
-		if err != nil {
-			panic(err)
-		}
-
-		err = execute.GoTest(ctx, pkg.Path(), opts.testRecursive)
-
-		mutant.Diff = string(diffStr)
-
-		switch err {
-		case execute.ErrMutationSurvived: // Tests passed -> FAIL
-			if !opts.silentMode {
-				fmt.Println(diffStr)
-			}
-		case nil: // Tests failed -> PASS
-			if opts.debug {
-				fmt.Println(diffStr)
-			}
-		case execute.ErrCompilationError: // Did not compile -> SKIP
-			slog.Info("Mutation did not compile")
-			if opts.debug {
-				fmt.Println(diffStr)
-			}
-
-		default: // Unknown exit code -> SKIP
-			if !opts.silentMode {
-				fmt.Println(diffStr)
-			}
-		}
-
-		return err
+		return execute.GoTest(ctx, mutant, execute.GoTestOptions{
+			Changed:       mutationFile,
+			Original:      file,
+			PackagePath:   pkg.Path(),
+			Debug:         opts.debug,
+			SilentMode:    opts.silentMode,
+			TestRecursive: opts.testRecursive,
+		})
 	}
 
 	log.Printf("Execute %q for mutation", opts.exec)
 
 	if err := execute.Custom(ctx, execs, execute.CustomMutationOptions{
 		Changed:       mutationFile,
-		Debug:         opts.debug,
 		Original:      file,
-		Package:       pkg.Path(),
-		Timeout:       opts.execTimeout,
+		PackagePath:   pkg.Path(),
+		Debug:         opts.debug,
 		Verbose:       opts.verbose,
+		Timeout:       opts.execTimeout,
 		TestRecursive: opts.testRecursive,
 	}); err != nil {
 		return fmt.Errorf("execute custom command %q: %w", execs[0], err)
