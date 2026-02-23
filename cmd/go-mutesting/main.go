@@ -334,15 +334,6 @@ MUTATOR:
 			panic(err)
 		}
 
-		tmpFile := filepath.Join(tmpDir, file)
-
-		originalFile := fmt.Sprintf("%s.original", tmpFile)
-		err = execute.CopyFile(file, originalFile)
-		if err != nil {
-			panic(err)
-		}
-		log.Printf("Save original into %q", originalFile)
-
 		mutationID := 0
 
 		if opts.match != "" {
@@ -353,11 +344,11 @@ MUTATOR:
 
 			for _, f := range astutil.Functions(src) {
 				if m.MatchString(f.Name.Name) {
-					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, f, tmpFile, rep)
+					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, f, tmpDir, rep)
 				}
 			}
 		} else {
-			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, src, tmpFile, rep)
+			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, src, tmpDir, rep)
 		}
 	}
 
@@ -384,26 +375,26 @@ func mutate(
 	originalFile string,
 	src *ast.File,
 	node ast.Node,
-	mutatedFile string,
+	tempDir string,
 	stats *report.Report,
 ) int {
 	skippedLines := importing.Skips(pkg.Fset, src)
+
+	originalSourceCode, err := os.ReadFile(originalFile)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	for _, m := range mutators {
 		log.Printf("Mutator %s", m.Name)
 
 		mutesting.MutateWalk(pkg, node, m.Mutator, skippedLines, func() {
-			originalSourceCode, err := os.ReadFile(originalFile)
-			if err != nil {
-				log.Fatal(err)
-			}
-
 			mutant := report.Mutant{}
 			mutant.Mutator.MutatorName = m.Name
 			mutant.Mutator.OriginalFilePath = originalFile
 			mutant.Mutator.OriginalSourceCode = string(originalSourceCode)
 
-			mutationFile := fmt.Sprintf("%s.%d", mutatedFile, mutationID)
+			mutationFile := filepath.Join(tempDir, fmt.Sprintf("%s.%d", originalFile, mutationID))
 			checksum, duplicate, err := saveAST(mutationBlackList, mutationFile, pkg.Fset, src)
 			if err != nil {
 				fmt.Printf("INTERNAL ERROR %s\n", err.Error())

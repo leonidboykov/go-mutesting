@@ -2,6 +2,7 @@ package execute
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +22,10 @@ var (
 	ErrCompilationError = errors.New("compilation error")
 )
 
+type replaceData struct {
+	Replace map[string]string
+}
+
 type GoTestOptions struct {
 	Changed       string
 	Original      string
@@ -36,20 +41,17 @@ func GoTest(ctx context.Context, mutant *report.Mutant, opts GoTestOptions) erro
 		panic(err) // TODO: Do not panic on every error.
 	}
 
-	defer func() {
-		_ = os.Rename(opts.Original+".tmp", opts.Original)
-	}()
-
-	err = os.Rename(opts.Original, opts.Original+".tmp")
+	overlayFile := opts.Changed + "-overlay.json"
+	overlayData, err := json.Marshal(replaceData{Replace: map[string]string{opts.Original: opts.Changed}})
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("marshal overlay file: %w", err)
 	}
-	err = CopyFile(opts.Changed, opts.Original)
-	if err != nil {
-		panic(err)
+	if err := os.WriteFile(overlayFile, overlayData, os.ModePerm); err != nil {
+		return fmt.Errorf("write overlay file: %w", err)
 	}
+	defer os.Remove(overlayFile)
 
-	err = runGoTest(ctx, opts.PackagePath, opts.TestRecursive)
+	err = runGoTest(ctx, opts.PackagePath, overlayFile, opts.TestRecursive)
 
 	mutant.Diff = string(diffStr)
 
@@ -78,13 +80,17 @@ func GoTest(ctx context.Context, mutant *report.Mutant, opts GoTestOptions) erro
 }
 
 // GoTest executes default go test command and returns is mutation was "killed", i.e. tests failed.
-func runGoTest(ctx context.Context, pkgName string, recursive bool) error {
+func runGoTest(ctx context.Context, pkgName, overlayFile string, recursive bool) error {
 	if recursive {
 		pkgName += "/..."
 	}
 
 	// The use of flag `-count=1` prevents from using testcache.
-	cmd := exec.CommandContext(ctx, "go", "test", "-count", "1", pkgName)
+	cmd := exec.CommandContext(ctx, "go", "test",
+		"-count", "1",
+		"-overlay", overlayFile,
+		pkgName,
+	)
 	cmd.Env = os.Environ() // Is is necessary?
 
 	output, err := cmd.CombinedOutput()
