@@ -19,6 +19,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -122,10 +123,6 @@ func main() {
 					yamlsrc.YAML("skip_with_build_tags", altsrc.NewStringPtrSourcer(&configFile)),
 				),
 			},
-			&cli.StringFlag{
-				Name:  "exec",
-				Usage: "execute this command for every mutation (by default the built-in exec command is used)",
-			},
 			&cli.BoolFlag{
 				Name:  "no-exec",
 				Usage: "skip the built-in exec command and just generate the mutations",
@@ -189,7 +186,6 @@ func main() {
 				match:                c.String("match"),
 				silentMode:           c.Bool("silent-mode"),
 				doNotRemoveTmpFolder: c.Bool("do-not-remove-tmp-folder"),
-				exec:                 c.String("exec"),
 				noExec:               c.Bool("no-exec"),
 				execTimeout:          c.Uint("exec-timeout"),
 				importingOpts: importing.Options{
@@ -221,7 +217,6 @@ type options struct {
 	silentMode           bool
 	testRecursive        bool
 	doNotRemoveTmpFolder bool
-	exec                 string
 	noExec               bool
 	execTimeout          uint
 	jsonOutput           bool
@@ -304,12 +299,11 @@ func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error)
 
 MUTATOR:
 	for _, name := range mutator.List() {
-		if len(opts.disableMutators) > 0 {
-			for _, d := range opts.disableMutators {
-				if ok, _ := filepath.Match(d, name); ok {
-					continue MUTATOR
-				}
-			}
+		if slices.ContainsFunc(opts.disableMutators, func(d string) bool {
+			ok, _ := filepath.Match(d, name)
+			return ok
+		}) {
+			continue MUTATOR
 		}
 
 		slog.Info("enable mutator", slog.String("name", name))
@@ -327,11 +321,6 @@ MUTATOR:
 	}
 	slog.Info(fmt.Sprintf("save mutations into %q", tmpDir))
 
-	var execs []string
-	if opts.exec != "" {
-		execs = strings.Fields(opts.exec)
-	}
-
 	for _, file := range files {
 		slog.Info("mutate", slog.String("file", file))
 
@@ -348,7 +337,7 @@ MUTATOR:
 		tmpFile := filepath.Join(tmpDir, file)
 
 		originalFile := fmt.Sprintf("%s.original", tmpFile)
-		err = CopyFile(file, originalFile)
+		err = execute.CopyFile(file, originalFile)
 		if err != nil {
 			panic(err)
 		}
@@ -364,11 +353,11 @@ MUTATOR:
 
 			for _, f := range astutil.Functions(src) {
 				if m.MatchString(f.Name.Name) {
-					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, f, tmpFile, execs, rep)
+					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, f, tmpFile, rep)
 				}
 			}
 		} else {
-			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, src, tmpFile, execs, rep)
+			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, src, tmpFile, rep)
 		}
 	}
 
@@ -396,7 +385,6 @@ func mutate(
 	src *ast.File,
 	node ast.Node,
 	mutatedFile string,
-	execs []string,
 	stats *report.Report,
 ) int {
 	skippedLines := importing.Skips(pkg.Fset, src)
@@ -427,7 +415,7 @@ func mutate(
 				log.Printf("Save mutation into %q with checksum %s", mutationFile, checksum)
 
 				if !opts.noExec {
-					mutationError := mutateExec(ctx, opts, pkg.Types, originalFile, mutationFile, execs, &mutant)
+					mutationError := mutateExec(ctx, opts, pkg.Types, originalFile, mutationFile, &mutant)
 
 					if mutationError != nil {
 						slog.Info("exec mutation", slog.Any("error", mutationError))
@@ -497,40 +485,21 @@ func mutateExec(
 	pkg *types.Package,
 	file string,
 	mutationFile string,
-	execs []string,
 	mutant *report.Mutant,
 ) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(opts.execTimeout)*time.Second)
 	defer cancel()
 
-	if len(execs) == 0 {
-		log.Printf("Execute built-in exec command for mutation")
+	log.Printf("Execute built-in exec command for mutation")
 
-		return execute.GoTest(ctx, mutant, execute.GoTestOptions{
-			Changed:       mutationFile,
-			Original:      file,
-			PackagePath:   pkg.Path(),
-			Debug:         opts.debug,
-			SilentMode:    opts.silentMode,
-			TestRecursive: opts.testRecursive,
-		})
-	}
-
-	log.Printf("Execute %q for mutation", opts.exec)
-
-	if err := execute.Custom(ctx, execs, execute.CustomMutationOptions{
+	return execute.GoTest(ctx, mutant, execute.GoTestOptions{
 		Changed:       mutationFile,
 		Original:      file,
 		PackagePath:   pkg.Path(),
 		Debug:         opts.debug,
-		Verbose:       opts.verbose,
-		Timeout:       opts.execTimeout,
+		SilentMode:    opts.silentMode,
 		TestRecursive: opts.testRecursive,
-	}); err != nil {
-		return fmt.Errorf("execute custom command %q: %w", execs[0], err)
-	}
-
-	return nil
+	})
 }
 
 func saveAST(mutationBlackList map[string]struct{}, file string, fset *token.FileSet, node ast.Node) (string, bool, error) {
@@ -562,55 +531,4 @@ func saveAST(mutationBlackList map[string]struct{}, file string, fset *token.Fil
 	}
 
 	return checksum, false, nil
-}
-
-// CopyFile copies a file from src to dst.
-//
-// Code copied from "github.com/zimmski/osutil". This package fails to compile
-// with alpine.
-func CopyFile(src string, dst string) (err error) {
-	s, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		e := s.Close()
-		if err == nil {
-			err = e
-		}
-	}()
-
-	d, err := os.Create(dst)
-	if err != nil {
-		// In case the file is a symlink, we need to remove the file before we can write to it.
-		if _, e := os.Lstat(dst); e == nil {
-			if e := os.Remove(dst); e != nil {
-				return e
-			}
-			d, err = os.Create(dst)
-			if err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-	}
-	defer func() {
-		e := d.Close()
-		if err == nil {
-			err = e
-		}
-	}()
-
-	_, err = io.Copy(d, s)
-	if err != nil {
-		return err
-	}
-
-	i, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	return os.Chmod(dst, i.Mode())
 }

@@ -42,13 +42,6 @@ func TestExecuteMutesting(t *testing.T) {
 			expectedErr:   "",
 		},
 		{
-			name:          "match",
-			root:          "../../example",
-			opts:          options{args: []string{"./..."}, execTimeout: 10, exec: "../scripts/exec/test-mutated-package.sh", match: "baz"},
-			expectedStats: report.Stats{Msi: 0.500000, KilledCount: 4, EscapedCount: 4, DuplicatedCount: 0, SkippedCount: 0, TotalMutantsCount: 8},
-			expectedErr:   "",
-		},
-		{
 			name: "skip without tests",
 			root: "../../example",
 			opts: options{args: []string{}, execTimeout: 10, importingOpts: importing.Options{
