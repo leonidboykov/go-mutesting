@@ -2,11 +2,16 @@ package execute
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
+
+	"github.com/leonidboykov/go-mutesting/internal/diff"
+	"github.com/leonidboykov/go-mutesting/internal/report"
 )
 
 var (
@@ -17,14 +22,75 @@ var (
 	ErrCompilationError = errors.New("compilation error")
 )
 
-// Default executes default go test command and returns is mutation was "killed", i.e. tests failed.
-func GoTest(ctx context.Context, pkgName string, recursive bool) error {
+type replaceData struct {
+	Replace map[string]string
+}
+
+type GoTestOptions struct {
+	Changed       string
+	Original      string
+	PackagePath   string
+	Debug         bool
+	SilentMode    bool
+	TestRecursive bool
+}
+
+func GoTest(ctx context.Context, mutant *report.Mutant, opts GoTestOptions) error {
+	diffStr, err := diff.CompareFiles(opts.Original, opts.Changed, mutant.Mutator.MutatorName)
+	if err != nil {
+		panic(err) // TODO: Do not panic on every error.
+	}
+
+	overlayFile := opts.Changed + "-overlay.json"
+	overlayData, err := json.Marshal(replaceData{Replace: map[string]string{opts.Original: opts.Changed}})
+	if err != nil {
+		return fmt.Errorf("marshal overlay file: %w", err)
+	}
+	if err := os.WriteFile(overlayFile, overlayData, os.ModePerm); err != nil {
+		return fmt.Errorf("write overlay file: %w", err)
+	}
+	defer os.Remove(overlayFile)
+
+	err = runGoTest(ctx, opts.PackagePath, overlayFile, opts.TestRecursive)
+
+	mutant.Diff = string(diffStr)
+
+	switch err {
+	case ErrMutationSurvived: // Tests passed -> FAIL
+		if !opts.SilentMode {
+			fmt.Println(diffStr)
+		}
+	case nil: // Tests failed -> PASS
+		if opts.Debug {
+			fmt.Println(diffStr)
+		}
+	case ErrCompilationError: // Did not compile -> SKIP
+		slog.Info("Mutation did not compile")
+		if opts.Debug {
+			fmt.Println(diffStr)
+		}
+
+	default: // Unknown exit code -> SKIP
+		if !opts.SilentMode {
+			fmt.Println(diffStr)
+		}
+	}
+
+	return err
+}
+
+// GoTest executes default go test command and returns is mutation was "killed", i.e. tests failed.
+func runGoTest(ctx context.Context, pkgName, overlayFile string, recursive bool) error {
 	if recursive {
 		pkgName += "/..."
 	}
 
 	// The use of flag `-count=1` prevents from using testcache.
-	cmd := exec.CommandContext(ctx, "go", "test", "-count", "1", pkgName)
+	cmd := exec.CommandContext(ctx, "go", "test",
+		"-count", "1",
+		"-overlay", overlayFile,
+		pkgName,
+	)
 	cmd.Env = os.Environ() // Is is necessary?
 
 	output, err := cmd.CombinedOutput()
@@ -57,4 +123,55 @@ func GoTest(ctx context.Context, pkgName string, recursive bool) error {
 
 	// Unknown error.
 	return err
+}
+
+// CopyFile copies a file from src to dst.
+//
+// Code copied from "github.com/zimmski/osutil". This package fails to compile
+// with alpine.
+func CopyFile(src string, dst string) (err error) {
+	s, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		e := s.Close()
+		if err == nil {
+			err = e
+		}
+	}()
+
+	d, err := os.Create(dst)
+	if err != nil {
+		// In case the file is a symlink, we need to remove the file before we can write to it.
+		if _, e := os.Lstat(dst); e == nil {
+			if e := os.Remove(dst); e != nil {
+				return e
+			}
+			d, err = os.Create(dst)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	defer func() {
+		e := d.Close()
+		if err == nil {
+			err = e
+		}
+	}()
+
+	_, err = io.Copy(d, s)
+	if err != nil {
+		return err
+	}
+
+	i, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	return os.Chmod(dst, i.Mode())
 }
