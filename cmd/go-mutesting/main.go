@@ -241,12 +241,6 @@ func executeMutesting(ctx context.Context, opts options) error {
 
 	if opts.jsonOutput {
 		if err := rep.WriteToFile(); err != nil {
-			return fmt.Errorf("write report: %w", err)
-		}
-	}
-
-	if opts.jsonOutput {
-		if err := rep.WriteToFile(); err != nil {
 			return fmt.Errorf("write report file: %w", err)
 		}
 	}
@@ -319,7 +313,7 @@ MUTATOR:
 	if err != nil {
 		panic(err)
 	}
-	slog.Info(fmt.Sprintf("save mutations into %q", tmpDir))
+	slog.Info("save mutations", slog.String("dir", tmpDir))
 
 	for _, file := range files {
 		slog.Info("mutate", slog.String("file", file))
@@ -397,7 +391,7 @@ func mutate(
 			mutationFile := filepath.Join(tempDir, fmt.Sprintf("%s.%d", originalFile, mutationID))
 			checksum, duplicate, err := saveAST(mutationBlackList, mutationFile, pkg.Fset, src)
 			if err != nil {
-				fmt.Printf("INTERNAL ERROR %s\n", err.Error())
+				slog.Error("save ast", slog.String("file", mutationFile), slog.Any("error", err))
 			} else if duplicate {
 				log.Printf("%q is a duplicate, we ignore it", mutationFile)
 
@@ -418,7 +412,7 @@ func mutate(
 					}
 					mutant.Mutator.MutatedSourceCode = string(mutatedSourceCode)
 
-					msg := fmt.Sprintf("%q with checksum %s", mutationFile, checksum)
+					msg := fmt.Sprintf("%q #%d with checksum %s", originalFile, mutationID, checksum)
 
 					switch {
 					case mutationError == nil: // Tests failed - all ok

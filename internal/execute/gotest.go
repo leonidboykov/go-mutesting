@@ -49,7 +49,6 @@ func GoTest(ctx context.Context, mutant *report.Mutant, opts GoTestOptions) erro
 	if err := os.WriteFile(overlayFile, overlayData, os.ModePerm); err != nil {
 		return fmt.Errorf("write overlay file: %w", err)
 	}
-	defer os.Remove(overlayFile)
 
 	err = runGoTest(ctx, opts.PackagePath, overlayFile, opts.TestRecursive)
 
