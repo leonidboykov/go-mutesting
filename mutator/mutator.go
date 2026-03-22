@@ -23,7 +23,7 @@ func New(name string) (Mutator, error) {
 	return mutator, nil
 }
 
-// List returns a list of all registered mutator names.
+// List returns a sorted list of all registered mutator names.
 func List() []string {
 	return slices.Sorted(maps.Keys(mutatorLookup))
 }
