@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/fatih/color v1.18.0
-	github.com/go-git/go-git/v6 v6.0.0-20260320111621-ea91339c5263
+	github.com/go-git/go-git/v6 v6.0.0-20260322064825-e9e97138967c
 	github.com/lmittmann/tint v1.1.3
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/stretchr/testify v1.11.1
