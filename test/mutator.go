@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/leonidboykov/go-mutesting"
@@ -24,24 +25,24 @@ func Mutator(t *testing.T, m mutator.Mutator, testFile string, expectedMutationC
 	t.Helper()
 
 	// Test if mutator is not nil
-	assert.NotNil(t, m)
+	require.NotNil(t, m)
 
 	// Read the origianl source code
 	data, err := os.ReadFile(testFile)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	// Parse and type-check the original source code
 	src, pkg, err := importing.ParseAndTypeCheckFile(testFile)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	skippedLines := importing.Skips(pkg.Fset, src)
 
 	// Mutate a non relevant node
-	assert.Nil(t, m(pkg.Types, pkg.TypesInfo, src))
+	require.Nil(t, m(pkg.Types, pkg.TypesInfo, src))
 
 	// Count the actual mutations
 	n := countWalk(pkg, src, m, skippedLines)
-	assert.Equal(t, expectedMutationCount, n)
+	require.Equal(t, expectedMutationCount, n)
 
 	var mutationsCount int
 	// Mutate all relevant nodes -> test whole mutation process
@@ -73,7 +74,7 @@ func Mutator(t *testing.T, m mutator.Mutator, testFile string, expectedMutationC
 		},
 	)
 
-	assert.Equal(t, expectedMutationCount, mutationsCount)
+	require.Equal(t, expectedMutationCount, mutationsCount)
 }
 
 // countWalk returns the number of corresponding mutations for a given mutator. It traverses the AST of the given node

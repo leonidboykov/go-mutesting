@@ -267,25 +267,23 @@ func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error)
 		return rep, nil
 	}
 
-	if len(opts.blacklist) > 0 {
-		for _, f := range opts.blacklist {
-			c, err := os.ReadFile(f)
-			if err != nil {
-				return nil, fmt.Errorf("read blacklist file %q: %w", f, err)
+	for _, f := range opts.blacklist {
+		c, err := os.ReadFile(f)
+		if err != nil {
+			return nil, fmt.Errorf("read blacklist file %q: %w", f, err)
+		}
+
+		for line := range strings.SplitSeq(string(c), "\n") {
+			if line == "" {
+				continue
 			}
 
-			for line := range strings.SplitSeq(string(c), "\n") {
-				if line == "" {
-					continue
-				}
-
-				if len(line) < md5Len {
-					return nil, fmt.Errorf("%q is not a MD5 checksum", line)
-				}
-
-				// Use the first 32 chars. Everything else is considered as a comment.
-				mutationBlackList[line[:md5Len]] = struct{}{}
+			if len(line) < md5Len {
+				return nil, fmt.Errorf("%q is not a MD5 checksum", line)
 			}
+
+			// Use the first 32 chars. Everything else is considered as a comment.
+			mutationBlackList[line[:md5Len]] = struct{}{}
 		}
 	}
 
