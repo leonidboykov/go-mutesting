@@ -38,7 +38,7 @@ type GoTestOptions struct {
 func GoTest(ctx context.Context, mutant *report.Mutant, opts GoTestOptions) error {
 	diffStr, err := diff.CompareFiles(opts.Original, opts.Changed, mutant.Mutator.MutatorName)
 	if err != nil {
-		panic(err) // TODO: Do not panic on every error.
+		return fmt.Errorf("compare files: %w", err)
 	}
 
 	overlayFile := opts.Changed + "-overlay.json"

@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
-	"sort"
+	"maps"
+	"slices"
 )
 
 // Mutator defines a mutator for mutation testing by returning a list of possible mutations for the given node.
@@ -19,21 +20,12 @@ func New(name string) (Mutator, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown mutator %q", name)
 	}
-
 	return mutator, nil
 }
 
 // List returns a list of all registered mutator names.
 func List() []string {
-	keyMutatorLookup := make([]string, 0, len(mutatorLookup))
-
-	for key := range mutatorLookup {
-		keyMutatorLookup = append(keyMutatorLookup, key)
-	}
-
-	sort.Strings(keyMutatorLookup)
-
-	return keyMutatorLookup
+	return slices.Sorted(maps.Keys(mutatorLookup))
 }
 
 // Register registers a mutator instance function with the given name.

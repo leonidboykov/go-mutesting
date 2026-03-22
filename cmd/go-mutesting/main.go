@@ -291,13 +291,12 @@ func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error)
 
 	var mutators []mutatorItem
 
-MUTATOR:
 	for _, name := range mutator.List() {
 		if slices.ContainsFunc(opts.disableMutators, func(d string) bool {
 			ok, _ := filepath.Match(d, name)
 			return ok
 		}) {
-			continue MUTATOR
+			continue
 		}
 
 		slog.Info("enable mutator", slog.String("name", name))
