@@ -253,10 +253,7 @@ func executeMutesting(ctx context.Context, opts options) error {
 }
 
 func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error) {
-	var (
-		rep               = new(report.Report)
-		mutationBlackList = map[string]struct{}{}
-	)
+	var rep = new(report.Report)
 
 	files, err := importing.FilesOfArgs(opts.args, opts.importingOpts)
 	if err != nil {
@@ -267,6 +264,7 @@ func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error)
 		return rep, nil
 	}
 
+	mutationBlackList := make(map[string]struct{}, len(opts.blacklist))
 	for _, f := range opts.blacklist {
 		c, err := os.ReadFile(f)
 		if err != nil {
@@ -288,7 +286,6 @@ func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error)
 	}
 
 	var mutators []mutatorItem
-
 	for _, name := range mutator.List() {
 		if slices.ContainsFunc(opts.disableMutators, func(d string) bool {
 			ok, _ := filepath.Match(d, name)
