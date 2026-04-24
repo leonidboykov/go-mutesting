@@ -3,44 +3,37 @@ package mutator
 import (
 	"go/ast"
 	"go/types"
-	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func mockMutator(pkg *types.Package, info *types.Info, node ast.Node) []Mutation {
-	// Do nothing
-
-	return nil
+	return nil // Do nothing
 }
 
 func TestMockMutator(t *testing.T) {
 	// Mock is not registered
-	for _, name := range List() {
-		if name == "mock" {
-			assert.Fail(t, "mock should not be in the mutator list yet")
-		}
-	}
+	require.NotContains(t, List(), "mock", "mock should not be in the mutator list yet")
 
 	m, err := New("mock")
 	assert.Nil(t, m)
 	assert.NotNil(t, err)
 
 	// Register mock
-	Register("mock", mockMutator)
+	assert.NotPanics(t, func() { Register("mock", mockMutator) })
 
 	// Mock is registered
-	found := slices.Contains(List(), "mock")
-	assert.True(t, found)
+	assert.Contains(t, List(), "mock")
 
 	m, err = New("mock")
 	assert.NotNil(t, m)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	// Register mock a second time
-	assert.Panics(t, func() { Register("mock", mockMutator) })
+	assert.PanicsWithValue(t, `mutator "mock" already registered`, func() { Register("mock", mockMutator) })
 
 	// Register nil function
-	assert.Panics(t, func() { Register("mockachino", nil) })
+	assert.PanicsWithValue(t, "mutator function is nil", func() { Register("mockachino", nil) })
 }

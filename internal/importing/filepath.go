@@ -230,12 +230,12 @@ func getMainBranchRef(repo *git.Repository, mainBranch string) (*plumbing.Refere
 		return nil, fmt.Errorf("local ref: %w", err)
 	}
 
-	parts := strings.SplitN(mainBranch, "/", 2)
-	if len(parts) != 2 {
+	remote, name, ok := strings.Cut(mainBranch, "/")
+	if !ok {
 		return nil, errors.New("remote branch is expected in for <remote>/<branch>")
 	}
 
-	mainRef, err = repo.Reference(plumbing.NewRemoteReferenceName(parts[0], parts[1]), false)
+	mainRef, err = repo.Reference(plumbing.NewRemoteReferenceName(remote, name), false)
 	if err != nil {
 		return nil, fmt.Errorf("remote ref: %w", err)
 	}

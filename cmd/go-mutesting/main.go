@@ -19,6 +19,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -31,7 +32,6 @@ import (
 
 	"github.com/leonidboykov/go-mutesting"
 	"github.com/leonidboykov/go-mutesting/internal/astutil"
-	"github.com/leonidboykov/go-mutesting/internal/diff"
 	"github.com/leonidboykov/go-mutesting/internal/execute"
 	"github.com/leonidboykov/go-mutesting/internal/importing"
 	"github.com/leonidboykov/go-mutesting/internal/report"
@@ -123,10 +123,6 @@ func main() {
 					yamlsrc.YAML("skip_with_build_tags", altsrc.NewStringPtrSourcer(&configFile)),
 				),
 			},
-			&cli.StringFlag{
-				Name:  "exec",
-				Usage: "execute this command for every mutation (by default the built-in exec command is used)",
-			},
 			&cli.BoolFlag{
 				Name:  "no-exec",
 				Usage: "skip the built-in exec command and just generate the mutations",
@@ -190,7 +186,6 @@ func main() {
 				match:                c.String("match"),
 				silentMode:           c.Bool("silent-mode"),
 				doNotRemoveTmpFolder: c.Bool("do-not-remove-tmp-folder"),
-				exec:                 c.String("exec"),
 				noExec:               c.Bool("no-exec"),
 				execTimeout:          c.Uint("exec-timeout"),
 				importingOpts: importing.Options{
@@ -222,7 +217,6 @@ type options struct {
 	silentMode           bool
 	testRecursive        bool
 	doNotRemoveTmpFolder bool
-	exec                 string
 	noExec               bool
 	execTimeout          uint
 	jsonOutput           bool
@@ -247,12 +241,6 @@ func executeMutesting(ctx context.Context, opts options) error {
 
 	if opts.jsonOutput {
 		if err := rep.WriteToFile(); err != nil {
-			return fmt.Errorf("write report: %w", err)
-		}
-	}
-
-	if opts.jsonOutput {
-		if err := rep.WriteToFile(); err != nil {
 			return fmt.Errorf("write report file: %w", err)
 		}
 	}
@@ -265,10 +253,7 @@ func executeMutesting(ctx context.Context, opts options) error {
 }
 
 func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error) {
-	var (
-		rep               = new(report.Report)
-		mutationBlackList = map[string]struct{}{}
-	)
+	var rep = new(report.Report)
 
 	files, err := importing.FilesOfArgs(opts.args, opts.importingOpts)
 	if err != nil {
@@ -279,38 +264,34 @@ func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error)
 		return rep, nil
 	}
 
-	if len(opts.blacklist) > 0 {
-		for _, f := range opts.blacklist {
-			c, err := os.ReadFile(f)
-			if err != nil {
-				return nil, fmt.Errorf("read blacklist file %q: %w", f, err)
+	mutationBlackList := make(map[string]struct{}, len(opts.blacklist))
+	for _, f := range opts.blacklist {
+		c, err := os.ReadFile(f)
+		if err != nil {
+			return nil, fmt.Errorf("read blacklist file %q: %w", f, err)
+		}
+
+		for line := range strings.SplitSeq(string(c), "\n") {
+			if line == "" {
+				continue
 			}
 
-			for line := range strings.SplitSeq(string(c), "\n") {
-				if line == "" {
-					continue
-				}
-
-				if len(line) < md5Len {
-					return nil, fmt.Errorf("%q is not a MD5 checksum", line)
-				}
-
-				// Use the first 32 chars. Everything else is considered as a comment.
-				mutationBlackList[line[:md5Len]] = struct{}{}
+			if len(line) < md5Len {
+				return nil, fmt.Errorf("%q is not a MD5 checksum", line)
 			}
+
+			// Use the first 32 chars. Everything else is considered as a comment.
+			mutationBlackList[line[:md5Len]] = struct{}{}
 		}
 	}
 
 	var mutators []mutatorItem
-
-MUTATOR:
 	for _, name := range mutator.List() {
-		if len(opts.disableMutators) > 0 {
-			for _, d := range opts.disableMutators {
-				if ok, _ := filepath.Match(d, name); ok {
-					continue MUTATOR
-				}
-			}
+		if slices.ContainsFunc(opts.disableMutators, func(d string) bool {
+			ok, _ := filepath.Match(d, name)
+			return ok
+		}) {
+			continue
 		}
 
 		slog.Info("enable mutator", slog.String("name", name))
@@ -326,12 +307,7 @@ MUTATOR:
 	if err != nil {
 		panic(err)
 	}
-	slog.Info(fmt.Sprintf("save mutations into %q", tmpDir))
-
-	var execs []string
-	if opts.exec != "" {
-		execs = strings.Fields(opts.exec)
-	}
+	slog.Info("save mutations", slog.String("dir", tmpDir))
 
 	for _, file := range files {
 		slog.Info("mutate", slog.String("file", file))
@@ -346,15 +322,6 @@ MUTATOR:
 			panic(err)
 		}
 
-		tmpFile := filepath.Join(tmpDir, file)
-
-		originalFile := fmt.Sprintf("%s.original", tmpFile)
-		err = CopyFile(file, originalFile)
-		if err != nil {
-			panic(err)
-		}
-		log.Printf("Save original into %q", originalFile)
-
 		mutationID := 0
 
 		if opts.match != "" {
@@ -365,11 +332,11 @@ MUTATOR:
 
 			for _, f := range astutil.Functions(src) {
 				if m.MatchString(f.Name.Name) {
-					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, f, tmpFile, execs, rep)
+					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, f, tmpDir, rep)
 				}
 			}
 		} else {
-			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, src, tmpFile, execs, rep)
+			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, src, tmpDir, rep)
 		}
 	}
 
@@ -396,30 +363,29 @@ func mutate(
 	originalFile string,
 	src *ast.File,
 	node ast.Node,
-	mutatedFile string,
-	execs []string,
+	tempDir string,
 	stats *report.Report,
 ) int {
 	skippedLines := importing.Skips(pkg.Fset, src)
+
+	originalSourceCode, err := os.ReadFile(originalFile)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	for _, m := range mutators {
 		log.Printf("Mutator %s", m.Name)
 
 		mutesting.MutateWalk(pkg, node, m.Mutator, skippedLines, func() {
-			originalSourceCode, err := os.ReadFile(originalFile)
-			if err != nil {
-				log.Fatal(err)
-			}
-
 			mutant := report.Mutant{}
 			mutant.Mutator.MutatorName = m.Name
 			mutant.Mutator.OriginalFilePath = originalFile
 			mutant.Mutator.OriginalSourceCode = string(originalSourceCode)
 
-			mutationFile := fmt.Sprintf("%s.%d", mutatedFile, mutationID)
+			mutationFile := filepath.Join(tempDir, fmt.Sprintf("%s.%d", originalFile, mutationID))
 			checksum, duplicate, err := saveAST(mutationBlackList, mutationFile, pkg.Fset, src)
 			if err != nil {
-				fmt.Printf("INTERNAL ERROR %s\n", err.Error())
+				slog.Error("save ast", slog.String("file", mutationFile), slog.Any("error", err))
 			} else if duplicate {
 				log.Printf("%q is a duplicate, we ignore it", mutationFile)
 
@@ -428,7 +394,7 @@ func mutate(
 				log.Printf("Save mutation into %q with checksum %s", mutationFile, checksum)
 
 				if !opts.noExec {
-					mutationError := mutateExec(ctx, opts, pkg.Types, originalFile, mutationFile, execs, &mutant)
+					mutationError := mutateExec(ctx, opts, pkg.Types, originalFile, mutationFile, &mutant)
 
 					if mutationError != nil {
 						slog.Info("exec mutation", slog.Any("error", mutationError))
@@ -440,7 +406,7 @@ func mutate(
 					}
 					mutant.Mutator.MutatedSourceCode = string(mutatedSourceCode)
 
-					msg := fmt.Sprintf("%q with checksum %s", mutationFile, checksum)
+					msg := fmt.Sprintf("%q #%d with checksum %s", originalFile, mutationID, checksum)
 
 					switch {
 					case mutationError == nil: // Tests failed - all ok
@@ -498,76 +464,21 @@ func mutateExec(
 	pkg *types.Package,
 	file string,
 	mutationFile string,
-	execs []string,
 	mutant *report.Mutant,
 ) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(opts.execTimeout)*time.Second)
 	defer cancel()
 
-	if len(execs) == 0 {
-		log.Printf("Execute built-in exec command for mutation")
+	log.Printf("Execute built-in exec command for mutation")
 
-		diffStr, err := diff.CompareFiles(file, mutationFile, mutant.Mutator.MutatorName)
-		if err != nil {
-			panic(err) // TODO: Do not panic on every error.
-		}
-
-		defer func() {
-			_ = os.Rename(file+".tmp", file)
-		}()
-
-		err = os.Rename(file, file+".tmp")
-		if err != nil {
-			panic(err)
-		}
-		err = CopyFile(mutationFile, file)
-		if err != nil {
-			panic(err)
-		}
-
-		err = execute.GoTest(ctx, pkg.Path(), opts.testRecursive)
-
-		mutant.Diff = string(diffStr)
-
-		switch err {
-		case execute.ErrMutationSurvived: // Tests passed -> FAIL
-			if !opts.silentMode {
-				fmt.Println(diffStr)
-			}
-		case nil: // Tests failed -> PASS
-			if opts.debug {
-				fmt.Println(diffStr)
-			}
-		case execute.ErrCompilationError: // Did not compile -> SKIP
-			slog.Info("Mutation did not compile")
-			if opts.debug {
-				fmt.Println(diffStr)
-			}
-
-		default: // Unknown exit code -> SKIP
-			if !opts.silentMode {
-				fmt.Println(diffStr)
-			}
-		}
-
-		return err
-	}
-
-	log.Printf("Execute %q for mutation", opts.exec)
-
-	if err := execute.Custom(ctx, execs, execute.CustomMutationOptions{
+	return execute.GoTest(ctx, mutant, execute.GoTestOptions{
 		Changed:       mutationFile,
-		Debug:         opts.debug,
 		Original:      file,
-		Package:       pkg.Path(),
-		Timeout:       opts.execTimeout,
-		Verbose:       opts.verbose,
+		PackagePath:   pkg.Path(),
+		Debug:         opts.debug,
+		SilentMode:    opts.silentMode,
 		TestRecursive: opts.testRecursive,
-	}); err != nil {
-		return fmt.Errorf("execute custom command %q: %w", execs[0], err)
-	}
-
-	return nil
+	})
 }
 
 func saveAST(mutationBlackList map[string]struct{}, file string, fset *token.FileSet, node ast.Node) (string, bool, error) {
@@ -599,55 +510,4 @@ func saveAST(mutationBlackList map[string]struct{}, file string, fset *token.Fil
 	}
 
 	return checksum, false, nil
-}
-
-// CopyFile copies a file from src to dst.
-//
-// Code copied from "github.com/zimmski/osutil". This package fails to compile
-// with alpine.
-func CopyFile(src string, dst string) (err error) {
-	s, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		e := s.Close()
-		if err == nil {
-			err = e
-		}
-	}()
-
-	d, err := os.Create(dst)
-	if err != nil {
-		// In case the file is a symlink, we need to remove the file before we can write to it.
-		if _, e := os.Lstat(dst); e == nil {
-			if e := os.Remove(dst); e != nil {
-				return e
-			}
-			d, err = os.Create(dst)
-			if err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-	}
-	defer func() {
-		e := d.Close()
-		if err == nil {
-			err = e
-		}
-	}()
-
-	_, err = io.Copy(d, s)
-	if err != nil {
-		return err
-	}
-
-	i, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	return os.Chmod(dst, i.Mode())
 }
