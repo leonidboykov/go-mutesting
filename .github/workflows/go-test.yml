@@ -10,7 +10,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version: "stable"
+          go-version: stable
       - name: Install Go JUnit Report
         run: go install github.com/jstemmer/go-junit-report/v2@latest
       - name: Run tests
@@ -19,10 +19,12 @@ jobs:
           go-junit-report -set-exit-code -out report.junit.xml
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: coverage
