@@ -46,6 +46,6 @@ Sure, just submit an [issue via the project tracker](https://github.com/leonidbo
 
 ## Slop-free software
 
-This software is 100% human-authored; no hallucinations are included. All AI-generated contributions will be rejected.
+This software is 100% human-authored. All AI-generated contributions will be rejected.
 
 [![This content is 100% human-authored](https://slop-free.org/logos/slop-free.svg)](https://slop-free.org/)
