@@ -296,7 +296,10 @@ func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error)
 
 		slog.Info("enable mutator", slog.String("name", name))
 
-		m, _ := mutator.New(name)
+		m, err := mutator.New(name)
+		if err != nil {
+			return nil, fmt.Errorf("create mutator %q: %w", name, err)
+		}
 		mutators = append(mutators, mutatorItem{
 			Name:    name,
 			Mutator: m,

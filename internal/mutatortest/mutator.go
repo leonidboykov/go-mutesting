@@ -1,4 +1,4 @@
-package test
+package mutatortest
 
 import (
 	"bytes"
@@ -18,10 +18,10 @@ import (
 	"github.com/leonidboykov/go-mutesting/mutator"
 )
 
-// Mutator tests a mutator.
+// Run tests a mutator.
 // It mutates the given original file with the given mutator. Every mutation is then validated with the given changed
 // file. The mutation overall count is validated with the given count.
-func Mutator(t *testing.T, m mutator.Mutator, testFile string, expectedMutationCount int) {
+func Run(t *testing.T, m mutator.Mutator, testFile string, expectedMutationCount int) {
 	t.Helper()
 
 	// Test if mutator is not nil
