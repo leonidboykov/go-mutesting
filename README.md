@@ -48,4 +48,6 @@ Sure, just submit an [issue via the project tracker](https://github.com/leonidbo
 
 This software is 100% human-authored. All AI-generated contributions will be rejected.
 
-[![This content is 100% human-authored](https://slop-free.org/logos/slop-free.svg)](https://slop-free.org/)
+<a href="https://slop-free.org" title="This content is 100% human-authored." target="_blank" rel="noopener noreferrer">
+  <img src="https://slop-free.org/logos/slop-free-url.svg" width="170" alt="slop-free.org logo" />
+</a>
