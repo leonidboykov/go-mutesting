@@ -3,11 +3,11 @@ package numbers
 import (
 	"testing"
 
-	"github.com/leonidboykov/go-mutesting/test"
+	"github.com/leonidboykov/go-mutesting/internal/mutatortest"
 )
 
 func TestMutatorNumbersDecrementer(t *testing.T) {
-	test.Mutator(
+	mutatortest.Run(
 		t,
 		MutatorNumbersDecrementer,
 		"../../testdata/numbers/decrementer.go",

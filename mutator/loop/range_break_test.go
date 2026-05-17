@@ -3,11 +3,11 @@ package loop
 import (
 	"testing"
 
-	"github.com/leonidboykov/go-mutesting/test"
+	"github.com/leonidboykov/go-mutesting/internal/mutatortest"
 )
 
 func TestMutatorLoopRangeBreak(t *testing.T) {
-	test.Mutator(
+	mutatortest.Run(
 		t,
 		MutatorLoopRangeBreak,
 		"../../testdata/loop/range_break.go",
