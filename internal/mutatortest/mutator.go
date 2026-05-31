@@ -21,32 +21,32 @@ import (
 // Run tests a mutator.
 // It mutates the given original file with the given mutator. Every mutation is then validated with the given changed
 // file. The mutation overall count is validated with the given count.
-func Run(t *testing.T, m mutator.Mutator, testFile string, expectedMutationCount int) {
+func Run(t *testing.T, mut mutator.Mutator, testFile string, expectedMutationCount int) {
 	t.Helper()
 
 	// Test if mutator is not nil
-	require.NotNil(t, m)
+	require.NotNil(t, mut)
 
 	// Read the origianl source code
 	data, err := os.ReadFile(testFile)
 	require.NoError(t, err)
 
 	// Parse and type-check the original source code
-	src, pkg, err := importing.ParseAndTypeCheckFile(testFile)
+	src, pkg, err := importing.ParseAndTypeCheckFile(t.Context(), testFile)
 	require.NoError(t, err)
 
 	skippedLines := importing.Skips(pkg.Fset, src)
 
 	// Mutate a non relevant node
-	require.Nil(t, m(pkg.Types, pkg.TypesInfo, src))
+	require.Nil(t, mut(pkg.Types, pkg.TypesInfo, src))
 
 	// Count the actual mutations
-	n := countWalk(pkg, src, m, skippedLines)
+	n := countWalk(pkg, src, mut, skippedLines)
 	require.Equal(t, expectedMutationCount, n)
 
 	var mutationsCount int
 	// Mutate all relevant nodes -> test whole mutation process
-	mutesting.MutateWalk(pkg, src, m, skippedLines,
+	mutesting.MutateWalk(pkg, src, mut, skippedLines,
 		func() {
 			buf := new(bytes.Buffer)
 			err = printer.Fprint(buf, pkg.Fset, src)

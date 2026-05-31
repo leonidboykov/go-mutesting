@@ -1,6 +1,7 @@
 package importing
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -13,16 +14,16 @@ import (
 
 // ParseFile parses the content of the given file and returns the corresponding [ast.File] node and its file set for
 // positional information. If a fatal error is encountered the error return argument is not nil.
-func ParseFile(filename string) (*ast.File, *token.FileSet, error) {
-	pkg, src, err := parseFile(filename)
+func ParseFile(ctx context.Context, filename string) (*ast.File, error) {
+	_, src, err := parseFile(ctx, filename)
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse file: %w", err)
+		return nil, fmt.Errorf("parse file: %w", err)
 	}
-	return src, pkg.Fset, err
+	return src, err
 }
 
-func ParseAndTypeCheckFile(filename string) (*ast.File, *packages.Package, error) {
-	pkg, src, err := parseFile(filename)
+func ParseAndTypeCheckFile(ctx context.Context, filename string) (*ast.File, *packages.Package, error) {
+	pkg, src, err := parseFile(ctx, filename)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse file: %w", err)
 	}
@@ -43,14 +44,15 @@ func Skips(fset *token.FileSet, src *ast.File) map[int]struct{} {
 	return skippedLines
 }
 
-func parseFile(filename string) (*packages.Package, *ast.File, error) {
+func parseFile(ctx context.Context, filename string) (*packages.Package, *ast.File, error) {
 	filenameAbs, err := filepath.Abs(filename)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get abs filename: %w", err)
 	}
 
 	pkgs, err := packages.Load(&packages.Config{
-		Mode: packages.LoadSyntax,
+		Context: ctx,
+		Mode:    packages.LoadSyntax,
 	}, filepath.Dir(filenameAbs))
 	if err != nil {
 		return nil, nil, fmt.Errorf("load package: %w", err)

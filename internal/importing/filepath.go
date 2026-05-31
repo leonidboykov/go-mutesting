@@ -29,7 +29,7 @@ func FilesOfArgs(args []string, opts Options) ([]string, error) {
 		args = []string{"."}
 	}
 	pkgs, err := packages.Load(&packages.Config{
-		Mode:  packages.LoadFiles,
+		Mode:  packages.NeedFiles,
 		Tests: false,
 	}, args...)
 	if err != nil {
@@ -102,7 +102,7 @@ func skipFilesWithoutTests(files iter.Seq[string]) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		for filename := range files {
 			nameSize := len(filename)
-			if nameSize <= 3 {
+			if nameSize <= extLen {
 				continue
 			}
 			testFileName := filename[:nameSize-extLen] + "_test.go"
@@ -142,7 +142,7 @@ func skipFilesWithBuildTag(files iter.Seq[string]) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		for filename := range files {
 			nameSize := len(filename)
-			if nameSize <= 3 {
+			if nameSize <= extLen {
 				continue
 			}
 			testFileName := filename[:nameSize-extLen] + "_test.go"

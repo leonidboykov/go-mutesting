@@ -179,9 +179,9 @@ func main() {
 			printASTCommand,
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			return executeMutesting(ctx, options{
+			suite, err := newSuite(options{
 				args:                 c.Args().Slice(),
-				disableMutators:      c.StringSlice("disable"),
+				disabledMutators:     c.StringSlice("disable"),
 				blacklist:            c.StringSlice("blacklist"),
 				match:                c.String("match"),
 				silentMode:           c.Bool("silent-mode"),
@@ -199,6 +199,10 @@ func main() {
 				verbose:             c.Bool("verbose"),
 				jsonOutput:          c.Bool("json_output"),
 			})
+			if err != nil {
+				return fmt.Errorf("prepare mutation framework: %w", err)
+			}
+			return suite.executeMutesting(ctx)
 		},
 	}).Run(ctx, os.Args); err != nil {
 		if !errors.Is(err, errMutantsEscaped) {
@@ -211,7 +215,7 @@ func main() {
 type options struct {
 	args                 []string
 	importingOpts        importing.Options
-	disableMutators      []string
+	disabledMutators     []string
 	blacklist            []string
 	match                string
 	silentMode           bool
@@ -225,47 +229,34 @@ type options struct {
 	verbose              bool
 }
 
-func executeMutesting(ctx context.Context, opts options) error {
-	rep, err := ExecuteMutesting(ctx, opts)
-	if err != nil {
-		return fmt.Errorf("execute mutesting: %w", err)
-	}
-
-	if !opts.noExec {
-		if !opts.silentMode {
-			fmt.Println(rep)
-		}
-	} else {
-		fmt.Println("Cannot do a mutation testing summary since no exec command was executed.")
-	}
-
-	if opts.jsonOutput {
-		if err := rep.WriteToFile(); err != nil {
-			return fmt.Errorf("write report file: %w", err)
-		}
-	}
-
-	if opts.exitCodeOnSurvivals && rep.Stats.EscapedCount > 0 {
-		return errMutantsEscaped
-	}
-
-	return nil
+// suite allows to execute mutations.
+type suite struct {
+	opts      options
+	checksums map[string]struct{}
+	mutators  []mutatorItem
 }
 
-func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error) {
-	var rep = new(report.Report)
-
-	files, err := importing.FilesOfArgs(opts.args, opts.importingOpts)
+// newSuite creates a new [suite].
+func newSuite(opts options) (*suite, error) {
+	checksums, err := loadChecksums(opts.blacklist)
 	if err != nil {
-		return nil, fmt.Errorf("load packages: %w", err)
+		return nil, fmt.Errorf("load checksums: %w", err)
 	}
-	if len(files) == 0 {
-		slog.Warn("could not find any suitable Go source files")
-		return rep, nil
+	mutators, err := loadMutators(opts.disabledMutators)
+	if err != nil {
+		return nil, fmt.Errorf("load mutators: %w", err)
 	}
+	return &suite{
+		opts:      opts,
+		checksums: checksums,
+		mutators:  mutators,
+	}, nil
+}
 
-	mutationBlackList := make(map[string]struct{}, len(opts.blacklist))
-	for _, f := range opts.blacklist {
+// loadChecksums loads files with blacklisted md5 checksums.
+func loadChecksums(files []string) (map[string]struct{}, error) {
+	checksums := make(map[string]struct{}, len(files))
+	for _, f := range files {
 		c, err := os.ReadFile(f)
 		if err != nil {
 			return nil, fmt.Errorf("read blacklist file %q: %w", f, err)
@@ -281,13 +272,16 @@ func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error)
 			}
 
 			// Use the first 32 chars. Everything else is considered as a comment.
-			mutationBlackList[line[:md5Len]] = struct{}{}
+			checksums[line[:md5Len]] = struct{}{}
 		}
 	}
+	return checksums, nil
+}
 
+func loadMutators(disabledMutators []string) ([]mutatorItem, error) {
 	var mutators []mutatorItem
 	for _, name := range mutator.List() {
-		if slices.ContainsFunc(opts.disableMutators, func(d string) bool {
+		if slices.ContainsFunc(disabledMutators, func(d string) bool {
 			ok, _ := filepath.Match(d, name)
 			return ok
 		}) {
@@ -305,50 +299,89 @@ func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error)
 			Mutator: m,
 		})
 	}
+	return mutators, nil
+}
+
+func (s *suite) executeMutesting(ctx context.Context) error {
+	rep, err := s.ExecuteMutesting(ctx)
+	if err != nil {
+		return fmt.Errorf("execute mutesting: %w", err)
+	}
+
+	if !s.opts.noExec {
+		if !s.opts.silentMode {
+			fmt.Println(rep)
+		}
+	} else {
+		fmt.Println("Cannot do a mutation testing summary since no exec command was executed.")
+	}
+
+	if s.opts.jsonOutput {
+		if err := rep.WriteToFile(); err != nil {
+			return fmt.Errorf("write report file: %w", err)
+		}
+	}
+
+	if s.opts.exitCodeOnSurvivals && rep.Stats.EscapedCount > 0 {
+		return errMutantsEscaped
+	}
+
+	return nil
+}
+
+func (s *suite) ExecuteMutesting(ctx context.Context) (*report.Report, error) {
+	var rep = new(report.Report)
+
+	files, err := importing.FilesOfArgs(s.opts.args, s.opts.importingOpts)
+	if err != nil {
+		return nil, fmt.Errorf("load packages: %w", err)
+	}
+	if len(files) == 0 {
+		slog.Warn("could not find any suitable Go source files")
+		return rep, nil
+	}
 
 	tmpDir, err := os.MkdirTemp("", "go-mutesting-")
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("create temp directory: %w", err)
 	}
 	slog.Info("save mutations", slog.String("dir", tmpDir))
 
 	for _, file := range files {
 		slog.Info("mutate", slog.String("file", file))
 
-		src, pkg, err := importing.ParseAndTypeCheckFile(file)
+		src, pkg, err := importing.ParseAndTypeCheckFile(ctx, file)
 		if err != nil {
 			return rep, fmt.Errorf("parse file: %w", err)
 		}
 
-		err = os.MkdirAll(filepath.Join(tmpDir, filepath.Dir(file)), 0755)
-		if err != nil {
-			panic(err)
+		if err := os.MkdirAll(filepath.Join(tmpDir, filepath.Dir(file)), 0755); err != nil {
+			return nil, fmt.Errorf("copy files in temp directory: %w", err)
 		}
 
-		mutationID := 0
+		var mutationID int
 
-		if opts.match != "" {
-			m, err := regexp.Compile(opts.match)
+		if s.opts.match != "" {
+			m, err := regexp.Compile(s.opts.match)
 			if err != nil {
-				return rep, fmt.Errorf("match regex is not valid: %w", err)
+				return nil, fmt.Errorf("match regex is not valid: %w", err)
 			}
 
 			for _, f := range astutil.Functions(src) {
 				if m.MatchString(f.Name.Name) {
-					mutationID = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, f, tmpDir, rep)
+					mutationID = s.mutate(ctx, mutationID, pkg, file, src, f, tmpDir, rep)
 				}
 			}
 		} else {
-			_ = mutate(ctx, opts, mutators, mutationBlackList, mutationID, pkg, file, src, src, tmpDir, rep)
+			_ = s.mutate(ctx, mutationID, pkg, file, src, src, tmpDir, rep)
 		}
 	}
 
-	if !opts.doNotRemoveTmpFolder {
-		err = os.RemoveAll(tmpDir)
-		if err != nil {
-			panic(err)
+	if !s.opts.doNotRemoveTmpFolder {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			return nil, fmt.Errorf("remove temp directory: %w", err)
 		}
-		log.Printf("Remove %q", tmpDir)
+		slog.Info("remove temp directory", slog.String("dir", tmpDir))
 	}
 
 	rep.Calculate()
@@ -356,11 +389,8 @@ func ExecuteMutesting(ctx context.Context, opts options) (*report.Report, error)
 	return rep, nil
 }
 
-func mutate(
+func (s *suite) mutate(
 	ctx context.Context,
-	opts options,
-	mutators []mutatorItem,
-	mutationBlackList map[string]struct{},
 	mutationID int,
 	pkg *packages.Package,
 	originalFile string,
@@ -376,7 +406,7 @@ func mutate(
 		log.Fatal(err)
 	}
 
-	for _, m := range mutators {
+	for _, m := range s.mutators {
 		log.Printf("Mutator %s", m.Name)
 
 		mutesting.MutateWalk(pkg, node, m.Mutator, skippedLines, func() {
@@ -386,7 +416,7 @@ func mutate(
 			mutant.Mutator.OriginalSourceCode = string(originalSourceCode)
 
 			mutationFile := filepath.Join(tempDir, fmt.Sprintf("%s.%d", originalFile, mutationID))
-			checksum, duplicate, err := saveAST(mutationBlackList, mutationFile, pkg.Fset, src)
+			checksum, duplicate, err := s.saveAST(mutationFile, pkg.Fset, src)
 			if err != nil {
 				slog.Error("save ast", slog.String("file", mutationFile), slog.Any("error", err))
 			} else if duplicate {
@@ -396,8 +426,8 @@ func mutate(
 			} else {
 				log.Printf("Save mutation into %q with checksum %s", mutationFile, checksum)
 
-				if !opts.noExec {
-					mutationError := mutateExec(ctx, opts, pkg.Types, originalFile, mutationFile, &mutant)
+				if !s.opts.noExec {
+					mutationError := s.mutateExec(ctx, pkg.Types, originalFile, mutationFile, &mutant)
 
 					if mutationError != nil {
 						slog.Info("exec mutation", slog.Any("error", mutationError))
@@ -414,7 +444,7 @@ func mutate(
 					switch {
 					case mutationError == nil: // Tests failed - all ok
 						out := fmt.Sprintf("PASS %s\n", msg)
-						if !opts.silentMode {
+						if !s.opts.silentMode {
 							fmt.Println(color.GreenString("✓ PASS"), msg)
 						}
 
@@ -423,7 +453,7 @@ func mutate(
 						stats.Stats.KilledCount++
 					case errors.Is(mutationError, execute.ErrMutationSurvived): // Tests passed
 						out := fmt.Sprintf("FAIL %s\n", msg)
-						if !opts.silentMode {
+						if !s.opts.silentMode {
 							fmt.Println(color.RedString("✗ FAIL"), msg)
 						}
 
@@ -433,7 +463,7 @@ func mutate(
 					case errors.Is(mutationError, execute.ErrCompilationError),
 						errors.Is(mutationError, context.DeadlineExceeded): // Did not compile
 						out := fmt.Sprintf("SKIP %s\n", msg)
-						if !opts.silentMode {
+						if !s.opts.silentMode {
 							fmt.Println("~ SKIP", msg)
 						}
 
@@ -444,7 +474,7 @@ func mutate(
 						os.Exit(1)
 					default:
 						out := fmt.Sprintf("UNKOWN exit code for %s: %s\n", msg, mutationError)
-						if !opts.silentMode {
+						if !s.opts.silentMode {
 							fmt.Print(out)
 						}
 
@@ -461,15 +491,14 @@ func mutate(
 	return mutationID
 }
 
-func mutateExec(
+func (s *suite) mutateExec(
 	ctx context.Context,
-	opts options,
 	pkg *types.Package,
 	file string,
 	mutationFile string,
 	mutant *report.Mutant,
 ) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(opts.execTimeout)*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.opts.execTimeout)*time.Second)
 	defer cancel()
 
 	log.Printf("Execute built-in exec command for mutation")
@@ -478,13 +507,13 @@ func mutateExec(
 		Changed:       mutationFile,
 		Original:      file,
 		PackagePath:   pkg.Path(),
-		Debug:         opts.debug,
-		SilentMode:    opts.silentMode,
-		TestRecursive: opts.testRecursive,
+		Debug:         s.opts.debug,
+		SilentMode:    s.opts.silentMode,
+		TestRecursive: s.opts.testRecursive,
 	})
 }
 
-func saveAST(mutationBlackList map[string]struct{}, file string, fset *token.FileSet, node ast.Node) (string, bool, error) {
+func (s *suite) saveAST(file string, fset *token.FileSet, node ast.Node) (string, bool, error) {
 	var buf bytes.Buffer
 
 	h := md5.New()
@@ -496,11 +525,11 @@ func saveAST(mutationBlackList map[string]struct{}, file string, fset *token.Fil
 
 	checksum := hex.EncodeToString(h.Sum(nil))
 
-	if _, ok := mutationBlackList[checksum]; ok {
+	if _, ok := s.checksums[checksum]; ok {
 		return checksum, true, nil
 	}
 
-	mutationBlackList[checksum] = struct{}{}
+	s.checksums[checksum] = struct{}{}
 
 	src, err := format.Source(buf.Bytes())
 	if err != nil {

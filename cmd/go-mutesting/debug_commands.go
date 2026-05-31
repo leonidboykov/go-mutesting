@@ -57,7 +57,7 @@ var printASTCommand = &cli.Command{
 		}
 		for _, file := range files {
 			fmt.Println(file)
-			src, _, err := importing.ParseFile(file)
+			src, err := importing.ParseFile(ctx, file)
 			if err != nil {
 				return fmt.Errorf("parse file %q: %v", file, err)
 			}
