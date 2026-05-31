@@ -26,8 +26,8 @@ func CompareFiles(origFilename, mutatedFilename, mutatorName string) (string, er
 // CompareStrings computes a diff for two files.
 func CompareStrings(original, mutated, mutatorName string) (string, error) {
 	diff, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
-		A:        difflib.SplitLines(string(original)),
-		B:        difflib.SplitLines(string(mutated)),
+		A:        difflib.SplitLines(original),
+		B:        difflib.SplitLines(mutated),
 		FromFile: "Original",
 		ToFile:   fmt.Sprintf("Mutation: %s", mutatorName),
 		Context:  3,

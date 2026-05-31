@@ -59,7 +59,9 @@ func TestExecuteMutesting(t *testing.T) {
 			assert.NoError(t, os.Chdir(tc.root))
 			t.Cleanup(func() { os.Chdir(saveCwd) })
 
-			rep, err := ExecuteMutesting(t.Context(), tc.opts)
+			s, err := newSuite(tc.opts)
+			require.NoError(t, err)
+			rep, err := s.ExecuteMutesting(t.Context())
 
 			assert.InDelta(t, tc.expectedStats.Msi, rep.Stats.Msi, 0.000001)
 			assert.Equal(t, tc.expectedStats.KilledCount, rep.Stats.KilledCount)
