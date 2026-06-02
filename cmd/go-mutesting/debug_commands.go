@@ -15,7 +15,7 @@ var listFilesCommand = &cli.Command{
 	Name:  "list-files",
 	Usage: "List found files",
 	Action: func(ctx context.Context, c *cli.Command) error {
-		files, err := importing.FilesOfArgs(c.Args().Slice(), importing.Options{
+		files, err := importing.FilesOfArgs(ctx, c.Args().Slice(), importing.Options{
 			SkipFileWithoutTest:  c.Bool("skip-without-test"),
 			SkipFileWithBuildTag: c.Bool("skip-with-build-tags"),
 			GitMainBranch:        c.String("git-branch"),
@@ -46,7 +46,7 @@ var printASTCommand = &cli.Command{
 	Name:  "print-ast",
 	Usage: "Print the ASTs of all given files and exit",
 	Action: func(ctx context.Context, c *cli.Command) error {
-		files, err := importing.FilesOfArgs(c.Args().Slice(), importing.Options{
+		files, err := importing.FilesOfArgs(ctx, c.Args().Slice(), importing.Options{
 			SkipFileWithoutTest:  c.Bool("skip-without-test"),
 			SkipFileWithBuildTag: c.Bool("skip-with-build-tags"),
 			GitMainBranch:        c.String("git-branch"),

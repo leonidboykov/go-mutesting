@@ -1,6 +1,7 @@
 package importing
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"iter"
@@ -24,13 +25,14 @@ type Options struct {
 	ExcludeDirs          []string
 }
 
-func FilesOfArgs(args []string, opts Options) ([]string, error) {
+func FilesOfArgs(ctx context.Context, args []string, opts Options) ([]string, error) {
 	if len(args) == 0 {
 		args = []string{"."}
 	}
 	pkgs, err := packages.Load(&packages.Config{
-		Mode:  packages.NeedFiles,
-		Tests: false,
+		Context: ctx,
+		Mode:    packages.NeedFiles,
+		Tests:   false,
 	}, args...)
 	if err != nil {
 		return nil, fmt.Errorf("load packages: %w", err)

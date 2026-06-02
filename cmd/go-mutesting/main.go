@@ -332,7 +332,7 @@ func (s *suite) executeMutesting(ctx context.Context) error {
 func (s *suite) ExecuteMutesting(ctx context.Context) (*report.Report, error) {
 	var rep = new(report.Report)
 
-	files, err := importing.FilesOfArgs(s.opts.args, s.opts.importingOpts)
+	files, err := importing.FilesOfArgs(ctx, s.opts.args, s.opts.importingOpts)
 	if err != nil {
 		return nil, fmt.Errorf("load packages: %w", err)
 	}
@@ -406,14 +406,15 @@ func (s *suite) mutate(
 		log.Fatal(err)
 	}
 
-	for _, m := range s.mutators {
-		log.Printf("Mutator %s", m.Name)
+	for _, mut := range s.mutators {
+		log.Printf("Mutator %s", mut.Name)
 
-		mutesting.MutateWalk(pkg, node, m.Mutator, skippedLines, func() {
-			mutant := report.Mutant{}
-			mutant.Mutator.MutatorName = m.Name
-			mutant.Mutator.OriginalFilePath = originalFile
-			mutant.Mutator.OriginalSourceCode = string(originalSourceCode)
+		mutesting.MutateWalk(pkg, node, mut.Mutator, skippedLines, func() {
+			mutant := report.Mutant{Mutator: report.Mutator{
+				MutatorName:        mut.Name,
+				OriginalFilePath:   originalFile,
+				OriginalSourceCode: string(originalSourceCode),
+			}}
 
 			mutationFile := filepath.Join(tempDir, fmt.Sprintf("%s.%d", originalFile, mutationID))
 			checksum, duplicate, err := s.saveAST(mutationFile, pkg.Fset, src)
@@ -427,17 +428,17 @@ func (s *suite) mutate(
 				log.Printf("Save mutation into %q with checksum %s", mutationFile, checksum)
 
 				if !s.opts.noExec {
-					mutationError := s.mutateExec(ctx, pkg.Types, originalFile, mutationFile, &mutant)
-
-					if mutationError != nil {
-						slog.Info("exec mutation", slog.Any("error", mutationError))
-					}
-
 					mutatedSourceCode, err := os.ReadFile(mutationFile)
 					if err != nil {
 						log.Fatal(err)
 					}
 					mutant.Mutator.MutatedSourceCode = string(mutatedSourceCode)
+
+					mutationError := s.mutateExec(ctx, pkg.Types, originalFile, mutationFile, &mutant)
+
+					if mutationError != nil {
+						slog.Info("exec mutation", slog.Any("error", mutationError))
+					}
 
 					msg := fmt.Sprintf("%q #%d with checksum %s", originalFile, mutationID, checksum)
 
