@@ -3,25 +3,11 @@ package diff
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/fatih/color"
 	"github.com/pmezard/go-difflib/difflib"
 )
-
-// CompareFiles reads files and computes a diff.
-func CompareFiles(origFilename, mutatedFilename, mutatorName string) (string, error) {
-	orig, err := os.ReadFile(origFilename)
-	if err != nil {
-		return "", fmt.Errorf("read original file: %w", err)
-	}
-	mutated, err := os.ReadFile(mutatedFilename)
-	if err != nil {
-		return "", fmt.Errorf("read mutated file: %w", err)
-	}
-	return CompareStrings(string(orig), string(mutated), mutatorName)
-}
 
 // CompareStrings computes a diff for two files.
 func CompareStrings(original, mutated, mutatorName string) (string, error) {

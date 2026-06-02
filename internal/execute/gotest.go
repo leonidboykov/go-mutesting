@@ -36,7 +36,11 @@ type GoTestOptions struct {
 }
 
 func GoTest(ctx context.Context, mutant *report.Mutant, opts GoTestOptions) error {
-	diffStr, err := diff.CompareFiles(opts.Original, opts.Changed, mutant.Mutator.MutatorName)
+	diffStr, err := diff.CompareStrings(
+		mutant.Mutator.OriginalSourceCode,
+		mutant.Mutator.MutatedSourceCode,
+		mutant.Mutator.MutatorName,
+	)
 	if err != nil {
 		return fmt.Errorf("compare files: %w", err)
 	}
