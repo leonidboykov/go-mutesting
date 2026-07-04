@@ -1,23 +1,35 @@
 version: 2
-multi-ecosystem-groups:
-  development:
-    update-types: [minor, patch]
+updates:
+  - package-ecosystem: gomod
+    directory: /
     schedule:
       interval: daily
+    groups:
+      minor-patch:
+        update-types: [minor, patch]
     commit-message:
       prefix: fix
       prefix-development: chore
       include: scope
-updates:
-  - package-ecosystem: gomod
-    directory: /
-    patterns: ["*"]
-    multi-ecosystem-group: development
   - package-ecosystem: github-actions
     directory: /
-    patterns: ["*"]
-    multi-ecosystem-group: development
+    schedule:
+      interval: daily
+    groups:
+      minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: scope
   - package-ecosystem: uv
     directory: /
-    patterns: ["*"]
-    multi-ecosystem-group: development
+    schedule:
+      interval: daily
+    groups:
+      minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: scope
