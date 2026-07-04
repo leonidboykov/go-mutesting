@@ -9,8 +9,8 @@ require (
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli-altsrc/v3 v3.1.0
-	github.com/urfave/cli/v3 v3.10.0
-	golang.org/x/tools v0.46.0
+	github.com/urfave/cli/v3 v3.10.1
+	golang.org/x/tools v0.47.0
 	pgregory.net/rapid v1.3.0
 )
 
