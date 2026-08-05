@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -112,8 +111,7 @@ func runGoTest(ctx context.Context, pkgName, overlayFile string, recursive bool)
 		return err
 	}
 
-	var exitError *exec.ExitError
-	if errors.As(err, &exitError) {
+	if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
 		switch exitError.ExitCode() {
 		case 1:
 			// Test failed and mutation is killed.
@@ -126,55 +124,4 @@ func runGoTest(ctx context.Context, pkgName, overlayFile string, recursive bool)
 
 	// Unknown error.
 	return err
-}
-
-// CopyFile copies a file from src to dst.
-//
-// Code copied from "github.com/zimmski/osutil". This package fails to compile
-// with alpine.
-func CopyFile(src string, dst string) (err error) {
-	s, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		e := s.Close()
-		if err == nil {
-			err = e
-		}
-	}()
-
-	d, err := os.Create(dst)
-	if err != nil {
-		// In case the file is a symlink, we need to remove the file before we can write to it.
-		if _, e := os.Lstat(dst); e == nil {
-			if e := os.Remove(dst); e != nil {
-				return e
-			}
-			d, err = os.Create(dst)
-			if err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-	}
-	defer func() {
-		e := d.Close()
-		if err == nil {
-			err = e
-		}
-	}()
-
-	_, err = io.Copy(d, s)
-	if err != nil {
-		return err
-	}
-
-	i, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	return os.Chmod(dst, i.Mode())
 }
