@@ -65,7 +65,7 @@ func main() {
 
 	logLevel := new(slog.LevelVar)
 	logLevel.Set(slog.LevelInfo)
-	slog.SetDefault(slog.New(tint.NewHandler(os.Stderr, &tint.Options{
+	slog.SetDefault(slog.New(tint.NewTextHandler(os.Stderr, &tint.Options{
 		Level:      logLevel,
 		TimeFormat: time.DateTime,
 	})))
