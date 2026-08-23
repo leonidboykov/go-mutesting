@@ -1,7 +1,8 @@
 package report
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"log/slog"
 	"os"
@@ -92,7 +93,7 @@ func (r *Report) WriteToFile() error {
 	}
 	defer file.Close()
 
-	if err := json.NewEncoder(file).Encode(r); err != nil {
+	if err := json.MarshalEncode(jsontext.NewEncoder(file), r); err != nil {
 		return fmt.Errorf("encode json: %w", err)
 	}
 
