@@ -5,12 +5,12 @@ go 1.27.0
 require (
 	github.com/fatih/color v1.19.0
 	github.com/go-git/go-git/v6 v6.0.0-alpha.5
-	github.com/lmittmann/tint v1.2.0
+	github.com/lmittmann/tint v1.2.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/stretchr/testify v1.12.1
 	github.com/urfave/cli-altsrc/v3 v3.1.0
-	github.com/urfave/cli/v3 v3.12.0
-	golang.org/x/tools v0.50.0
+	github.com/urfave/cli/v3 v3.14.0
+	golang.org/x/tools v0.51.0
 	pgregory.net/rapid v1.3.0
 )
 
