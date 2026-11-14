@@ -87,9 +87,7 @@ func runGoTest(ctx context.Context, pkgName, overlayFile string, recursive bool)
 		pkgName += "/..."
 	}
 
-	// The use of flag `-count=1` prevents from using testcache.
 	cmd := exec.CommandContext(ctx, "go", "test",
-		"-count", "1",
 		"-overlay", overlayFile,
 		pkgName,
 	)

@@ -471,7 +471,7 @@ func (s *suite) mutate(
 						mutant.ProcessOutput = out
 						stats.Stats.SkippedCount++
 					case errors.Is(mutationError, context.Canceled): // Cancel
-						slog.Warn("cancel signal received, exiting now")
+						slog.Warn("cancel signal received, exiting now", slog.Any("cause", context.Cause(ctx)))
 						os.Exit(1)
 					default:
 						out := fmt.Sprintf("UNKOWN exit code for %s: %s\n", msg, mutationError)

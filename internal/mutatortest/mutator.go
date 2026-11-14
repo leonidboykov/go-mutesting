@@ -27,7 +27,7 @@ func Run(t *testing.T, mut mutator.Mutator, testFile string, expectedMutationCou
 	// Test if mutator is not nil
 	require.NotNil(t, mut)
 
-	// Read the origianl source code
+	// Read the original source code
 	data, err := os.ReadFile(testFile)
 	require.NoError(t, err)
 
